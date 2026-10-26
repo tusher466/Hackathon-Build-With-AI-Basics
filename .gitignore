@@ -1,0 +1,7 @@
+# Devpost Learn - Personal learning context
+/devpost/learner-profile.md
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
