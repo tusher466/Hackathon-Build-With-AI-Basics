@@ -51,11 +51,28 @@
     return `${dayName}, ${d.getDate()} ${monthName}`;
   }
 
+  function getSubjectBadgeColor(item) {
+    if (!item) return 'indigo';
+    const lower = (item.name || item.subject || '').toLowerCase();
+    if (lower.includes('calc')) return 'indigo';
+    if (lower.includes('phys')) return 'violet';
+    if (lower.includes('econ')) return 'sky';
+    if (item.color === 'violet' || item.color === 'rose' || item.color === 'sky' || item.color === 'indigo') {
+      return item.color;
+    }
+    if (item.color === 'teal') return 'violet';
+    if (item.color === 'emerald') return 'sky';
+    return 'indigo';
+  }
+
   // App State & DOM Elements
   const App = {
     currentView: 'today',
 
     init: function() {
+      if (window.location.hash === '#plan') {
+        this.currentView = 'plan';
+      }
       this.cacheElements();
       this.bindEvents();
       this.render();
@@ -112,6 +129,15 @@
 
     bindEvents: function() {
       const self = this;
+
+      // Brand Home
+      const brandHome = document.getElementById('brand-home');
+      if (brandHome) {
+        brandHome.addEventListener('click', function(e) {
+          e.preventDefault();
+          self.switchView('today');
+        });
+      }
 
       // Welcome CTA
       if (this.btnWelcomeAdd) {
@@ -185,6 +211,17 @@
       }
 
       // Navigation tab switching
+      const mainNav = document.getElementById('main-nav');
+      if (mainNav) {
+        mainNav.addEventListener('click', function(e) {
+          const btn = e.target.closest('.nav-pill');
+          if (!btn) return;
+          const view = btn.getAttribute('data-view');
+          if (view) {
+            self.switchView(view);
+          }
+        });
+      }
       if (this.navToday) {
         this.navToday.addEventListener('click', function() {
           self.switchView('today');
@@ -195,6 +232,13 @@
           self.switchView('plan');
         });
       }
+
+      window.addEventListener('hashchange', function() {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === 'plan' || hash === 'today') {
+          self.switchView(hash);
+        }
+      });
 
       // Difficulty buttons selector
       this.diffButtons.forEach(function(btn) {
@@ -378,6 +422,7 @@
       }
 
       // Assign subject color: Calculus -> indigo, Physics -> violet, Economics -> sky, or cycle
+      const existingExams = window.ReboundStorage.getExams();
       const lowerName = name.toLowerCase();
       let color = 'indigo';
       if (lowerName.includes('calc')) {
@@ -494,19 +539,6 @@
 
       let html = '';
       const self = this;
-  function getSubjectBadgeColor(exam) {
-    if (!exam) return 'indigo';
-    const lower = (exam.name || '').toLowerCase();
-    if (lower.includes('calc')) return 'indigo';
-    if (lower.includes('phys')) return 'violet';
-    if (lower.includes('econ')) return 'sky';
-    if (exam.color === 'violet' || exam.color === 'rose' || exam.color === 'sky' || exam.color === 'indigo') {
-      return exam.color;
-    }
-    if (exam.color === 'teal') return 'violet';
-    if (exam.color === 'emerald') return 'sky';
-    return 'indigo';
-  }
 
       exams.forEach(function(exam) {
         const days = getDaysFromToday(exam.date);
@@ -552,18 +584,67 @@
 
     switchView: function(viewName) {
       this.currentView = viewName;
+      try {
+        if (window.location.hash !== '#' + viewName) {
+          window.history.replaceState(null, '', '#' + viewName);
+        }
+      } catch (e) {}
+
       if (viewName === 'today') {
-        this.navToday.classList.add('active');
-        this.navPlan.classList.remove('active');
+        if (this.navToday) this.navToday.classList.add('active');
+        if (this.navPlan) this.navPlan.classList.remove('active');
       } else {
-        this.navPlan.classList.add('active');
-        this.navToday.classList.remove('active');
+        if (this.navPlan) this.navPlan.classList.add('active');
+        if (this.navToday) this.navToday.classList.remove('active');
       }
       this.render();
     },
 
     render: function() {
       try {
+        if (!document.getElementById('today-view') || !document.getElementById('plan-view')) {
+          const root = document.getElementById('app-root');
+          if (root) {
+            root.innerHTML = `
+              <section class="welcome-card" id="welcome-view" aria-labelledby="welcome-title">
+                <div class="welcome-badge">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                  Ready for your exams
+                </div>
+                <h2 id="welcome-title">Welcome to Rebound</h2>
+                <p>University exams close together? Rebound creates a daily study schedule that gives more time to harder subjects and sooner exams. If you miss a day, it recalculates without guilt.</p>
+                <div class="welcome-highlights">
+                  <div class="highlight-item">
+                    <h3>Smart Weighting</h3>
+                    <p>Harder subjects and closer exams automatically get more time.</p>
+                  </div>
+                  <div class="highlight-item">
+                    <h3>Day-Before Light Rev</h3>
+                    <p>The day before each exam is protected for calm, light formula review.</p>
+                  </div>
+                  <div class="highlight-item">
+                    <h3>Zero-Guilt Rebound</h3>
+                    <p>Miss a day? Tap one button to see what moves, with full undo support.</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-lg" id="btn-welcome-add">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                  Add my first exam
+                </button>
+              </section>
+              <section id="today-view" style="display: none;" aria-label="Today's Study Schedule"></section>
+              <section id="plan-view" style="display: none;" aria-label="Full Exam Study Plan"></section>
+            `;
+            this.cacheElements();
+            if (this.btnWelcomeAdd) {
+              const self = this;
+              this.btnWelcomeAdd.addEventListener('click', function() {
+                self.openExamsModal();
+              });
+            }
+          }
+        }
+
         const exams = window.ReboundStorage.getExams();
         const settings = window.ReboundStorage.getSettings();
         let plan = window.ReboundStorage.getPlan();

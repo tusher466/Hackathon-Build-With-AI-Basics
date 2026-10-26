@@ -69,12 +69,21 @@
     const totalCapacity = totalStudyDays * dailyHours;
     if (totalNeeded > totalCapacity) {
       const deficit = roundToHalfHour(totalNeeded - totalCapacity);
+      const sortedByDiff = exams.slice().sort(function(a, b) {
+        return a.difficulty - b.difficulty;
+      });
+      const trimmedSub = sortedByDiff[0].name;
+      const prioritizedSubs = sortedByDiff.slice(1).map(function(s) { return s.name; });
+      let trimmedDetail = `trimmed ${trimmedSub} to core summaries`;
+      if (prioritizedSubs.length > 0) {
+        trimmedDetail = `prioritized your upcoming ${prioritizedSubs.join(' and ')} exams and ${trimmedDetail}`;
+      }
       return {
         isShortfall: true,
         totalNeeded: totalNeeded,
         totalCapacity: totalCapacity,
         hoursShort: deficit,
-        message: `You have ${totalNeeded} hours of study needed, but only ${totalCapacity} hours available at ${dailyHours}h/day (short by ${deficit} hours). Low-difficulty topics have been prioritized for summary review to protect your exam readiness.`
+        message: `You have ${totalNeeded} hours of study needed across ${exams.length} subjects, but only ${totalCapacity} hours available at ${dailyHours}h/day (short by ${deficit} hours). We ${trimmedDetail} to protect your exam readiness and rest.`
       };
     }
     return {
@@ -155,78 +164,69 @@
             isRevision: true,
             isExamDay: false
           });
-          availableDayHours -= revH;
+          availableDayHours = roundToHalfHour(availableDayHours - revH);
         }
       });
 
-      // Allocate remaining available hours to active subjects (d < examDay - 1)
-      const activeSubjects = subjects.filter(function(sub) {
-        return dayOffset < sub.examDay - 1 && sub.remainingCoreHours > 0;
-      });
-
-      if (activeSubjects.length > 0 && availableDayHours > 0) {
-        // Calculate urgency weights
-        let totalWeight = 0;
-        activeSubjects.forEach(function(sub) {
-          const daysLeftUntilRev = (sub.examDay - 1) - dayOffset;
-          // Priority formula: more remaining hours + sooner exam + higher difficulty
-          sub.urgencyScore = (sub.remainingCoreHours / Math.max(1, daysLeftUntilRev)) * (sub.difficulty / 3);
-          totalWeight += sub.urgencyScore;
+      // Allocate core hours in 0.5h slices
+      while (availableDayHours >= 0.5) {
+        const eligible = subjects.filter(function(s) {
+          return dayOffset < s.examDay - 1 && s.remainingCoreHours >= 0.5;
         });
+        if (eligible.length === 0) break;
 
-        // Sort by urgency descending so highest priority gets clean blocks first
-        activeSubjects.sort(function(a, b) {
-          return b.urgencyScore - a.urgencyScore;
-        });
+        const scored = eligible.map(function(s) {
+          const daysLeft = (s.examDay - 1) - dayOffset;
+          const taskToday = tasks.find(function(t) { return t.examId === s.id && !t.isRevision && !t.isExamDay; });
+          const currentHoursToday = taskToday ? taskToday.hours : 0;
+          const maxBlock = (daysLeft === 1) ? Math.min(availableDayHours + currentHoursToday, s.remainingCoreHours + currentHoursToday) : 2.5;
+          const canTakeMore = currentHoursToday + 0.5 <= maxBlock;
 
-        // Allocate hours in half-hour increments
-        activeSubjects.forEach(function(sub, idx) {
-          if (availableDayHours <= 0 || sub.remainingCoreHours <= 0) return;
-
-          let rawShare = (sub.urgencyScore / totalWeight) * availableDayHours;
-          let alloc = roundToHalfHour(rawShare);
-
-          // Constraints: min 0.5h if allocating, max 2.5h, not exceeding remaining needed
-          if (alloc < 0.5 && availableDayHours >= 0.5 && sub.remainingCoreHours >= 0.5) {
-            alloc = 0.5;
+          let urgency = (s.remainingCoreHours / Math.pow(Math.max(1, daysLeft), 1.5)) * (s.difficulty / 3);
+          if (daysLeft === 1) {
+            urgency += 100; // Must finish core before revision tomorrow!
+          } else if (dayOffset === 0 && currentHoursToday === 0 && s.remainingCoreHours >= 1.0) {
+            urgency += 1.0; // Day 1 kickoff representation
           }
-          alloc = Math.min(alloc, 2.5, availableDayHours, sub.remainingCoreHours);
-          alloc = roundToHalfHour(alloc);
+          return { s: s, canTakeMore: canTakeMore, score: urgency };
+        }).filter(function(x) { return x.canTakeMore; });
 
-          // If last active subject, try to take whatever clean remaining budget fits
-          if (idx === activeSubjects.length - 1 && availableDayHours > alloc) {
-            const extra = roundToHalfHour(availableDayHours - alloc);
-            if (extra >= 0.5 && sub.remainingCoreHours >= alloc + extra && alloc + extra <= 2.5) {
-              alloc += extra;
-            }
-          }
+        if (scored.length === 0) break;
 
-          if (alloc > 0) {
-            // Determine chapter range
-            const chStart = Math.min(sub.chapters, sub.chaptersAssigned + 1);
-            const chaptersInBlock = Math.max(1, Math.round((alloc / sub.totalHours) * sub.chapters));
-            const chEnd = Math.min(sub.chapters, chStart + chaptersInBlock - 1);
-            sub.chaptersAssigned = chEnd;
+        scored.sort(function(a, b) { return b.score - a.score; });
+        const chosen = scored[0].s;
 
-            const chLabel = (chStart === chEnd) ? `Ch. ${chStart}` : `Ch. ${chStart}–${chEnd}`;
-
-            tasks.push({
-              id: `task_${dayIndex}_${sub.id}`,
-              examId: sub.id,
-              subject: sub.name,
-              color: sub.color,
-              chapters: chLabel,
-              hours: alloc,
-              completed: false,
-              isRevision: false,
-              isExamDay: false
-            });
-
-            sub.remainingCoreHours = roundToHalfHour(sub.remainingCoreHours - alloc);
-            availableDayHours = roundToHalfHour(availableDayHours - alloc);
-          }
-        });
+        let task = tasks.find(function(t) { return t.examId === chosen.id && !t.isRevision && !t.isExamDay; });
+        if (!task) {
+          task = {
+            id: `task_${dayIndex}_${chosen.id}`,
+            examId: chosen.id,
+            subject: chosen.name,
+            color: chosen.color,
+            chapters: '',
+            hours: 0,
+            completed: false,
+            isRevision: false,
+            isExamDay: false
+          };
+          tasks.push(task);
+        }
+        task.hours = roundToHalfHour(task.hours + 0.5);
+        chosen.remainingCoreHours = roundToHalfHour(chosen.remainingCoreHours - 0.5);
+        availableDayHours = roundToHalfHour(availableDayHours - 0.5);
       }
+
+      // Assign chapter labels for tasks on this day
+      tasks.forEach(function(t) {
+        if (t.isExamDay || t.isRevision) return;
+        const sub = subjects.find(function(s) { return s.id === t.examId; });
+        if (!sub) return;
+        const chStart = Math.min(sub.chapters, sub.chaptersAssigned + 1);
+        const chaptersInBlock = Math.max(1, Math.round((t.hours / sub.totalHours) * sub.chapters));
+        const chEnd = Math.min(sub.chapters, chStart + chaptersInBlock - 1);
+        sub.chaptersAssigned = chEnd;
+        t.chapters = (chStart === chEnd) ? `Ch. ${chStart}` : `Ch. ${chStart}–${chEnd}`;
+      });
 
       // Calculate total scheduled study hours (excluding exam days)
       let dayStudyHours = 0;
