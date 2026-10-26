@@ -272,21 +272,22 @@ When *"I missed today"* is triggered on Day $d$:
 
 ---
 
-### Initial Plan (Days 1 to 10)
+### Initial Plan (Calendar Dates: Mon 26 Oct to Thu 5 Nov)
 
-| Day | Calculus (Exam Day 6) | Physics (Exam Day 8) | Economics (Exam Day 10) | Day Total | Focus Notes |
-|:---|:---|:---|:---|:---|:---|
-| **Day 1** | 1.5h (Ch. 1–2) | 1.5h (Ch. 1) | 1.0h (Ch. 1) | **4.0h** | 3 tasks; balanced kickoff |
-| **Day 2** | 2.5h (Ch. 3–4) | 1.5h (Ch. 2) | — | **4.0h** | Calculus weighted high (urgency) |
-| **Day 3** | 2.5h (Ch. 5–6) | 1.5h (Ch. 3) | — | **4.0h** | Calculus push |
-| **Day 4** | 2.5h (Ch. 7–8) | 1.5h (Ch. 4) | — | **4.0h** | Calculus core complete |
-| **Day 5** | **1.0h (Light Revision)** | 2.0h (Ch. 5) | 1.0h (Ch. 2) | **4.0h** | **Calculus Day-Before Light Rev** |
-| **Day 6** | **0h (CALCULUS EXAM)** | 2.5h (Ch. 6) | 1.5h (Ch. 3) | **4.0h** | Calculus Exam Day; Physics push |
-| **Day 7** | — | **1.0h (Light Revision)** | 1.5h (Ch. 4) | **2.5h** | **Physics Day-Before Light Rev** |
-| **Day 8** | — | **0h (PHYSICS EXAM)** | 1.0h (Ch. 5) | **1.0h** | Physics Exam Day; Economics core done |
-| **Day 9** | — | — | **1.0h (Light Revision)** | **1.0h** | **Economics Day-Before Light Rev** |
-| **Day 10** | — | — | **0h (ECONOMICS EXAM)** | **0h** | **Economics Exam Day** |
-| **Total**| **12.0h** | **12.0h** | **5.0h** | **29.0h** | All requirements satisfied |
+| Calendar Date | Relative Day | Calculus (Exam 1 Nov) | Physics (Exam 3 Nov) | Economics (Exam 5 Nov) | Day Total | Focus & Rules |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Mon 26 Oct** | Day 1 (Today) | 1.5h *(Ch. 1)* | 1.5h *(Ch. 1)* | 1.0h *(Ch. 1)* | **4.0h** | Kickoff: balanced across active subjects |
+| **Tue 27 Oct** | Day 2 | 2.5h *(Ch. 2–3)* | 1.5h *(Ch. 2)* | — | **4.0h** | Calculus weighted high (urgency) |
+| **Wed 28 Oct** | Day 3 | 2.5h *(Ch. 4–5)* | 1.5h *(Ch. 3)* | — | **4.0h** | Calculus priority push |
+| **Thu 29 Oct** | Day 4 | 2.5h *(Ch. 6–7)* | 1.5h *(Ch. 4)* | — | **4.0h** | Calculus priority push |
+| **Fri 30 Oct** | Day 5 | 2.0h *(Ch. 8)* | 2.0h *(Ch. 5)* | — | **4.0h** | Calculus core complete (11h) |
+| **Sat 31 Oct** | Day 6 | **1.0h (Light Revision)** | 2.5h *(Ch. 6)* | 0.5h *(Ch. 2)* | **4.0h** | **Calculus Day-Before Light Revision (1h cap)** |
+| **Sun 1 Nov** | Day 7 | **0h (EXAM DAY)** | 0.5h *(Core wrap)* | 1.5h *(Ch. 3)* | **2.0h** | **Calculus Exam** (0h); Physics core done (11h) |
+| **Mon 2 Nov** | Day 8 | — | **1.0h (Light Revision)** | 1.0h *(Ch. 4)* | **2.0h** | **Physics Day-Before Light Revision (1h cap)** |
+| **Tue 3 Nov** | Day 9 | — | **0h (EXAM DAY)** | 1.0h *(Ch. 5)* | **1.0h** | **Physics Exam** (0h); Economics core done (4h) |
+| **Wed 4 Nov** | Day 10 | — | — | **1.0h (Light Revision)** | **1.0h** | **Economics Day-Before Light Revision (1h cap)** |
+| **Thu 5 Nov** | Day 11 | — | — | **0h (EXAM DAY)** | **0h** | **Economics Exam** (All done!) |
+| **Totals** | | **12.0h** | **12.0h** | **5.0h** | **29.0h** | Exactly 12h, 12h, 5h |
 
 ---
 
