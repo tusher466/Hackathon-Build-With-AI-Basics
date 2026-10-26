@@ -1,15 +1,15 @@
 ---
 doc: checklist
-status: draft
+status: approved
 ---
 
 # Build Checklist
 
-Build mode: [learn or fast — record once chosen; carry forward on resume]
+Build mode: learn
 
 ## Slices
 
-- [ ] **1. Project scaffold, design system, and first-run welcome view**
+- [x] **1. Project scaffold, design system, and first-run welcome view**
   Becomes usable: A running web app with our custom theme, typography, cards, and the first-run Welcome screen with an *"Add my first exam"* call-to-action.
   Why now: Bootstraps the project scaffold and visual tokens so every later slice renders into a polished, responsive container.
   PRD ref: `prd.md > Screens and Layout (1. Welcome View)`, `prd.md > Look and Feel`

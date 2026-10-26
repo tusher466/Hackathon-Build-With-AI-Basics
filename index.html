@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rebound — A study plan that bounces back when you miss a day</title>
+  <meta name="description" content="An intelligent study planner for university students that dynamically rebalances remaining work and visualizes changes when study days are missed.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="#" class="brand" id="brand-home" aria-label="Rebound Home">
+        <div class="brand-icon" aria-hidden="true">R</div>
+        <div class="brand-text">
+          <h1>Rebound</h1>
+          <p>Bounces back when you miss a day</p>
+        </div>
+      </a>
+
+      <!-- Navigation Pills -->
+      <nav class="nav-pills" id="main-nav" aria-label="Main Navigation">
+        <button type="button" class="nav-pill active" id="nav-today" data-view="today">Today</button>
+        <button type="button" class="nav-pill" id="nav-plan" data-view="plan">Full Plan</button>
+      </nav>
+
+      <!-- Header Actions -->
+      <div class="header-actions">
+        <button type="button" class="btn btn-secondary" id="btn-open-exams" aria-label="Manage Exams">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Exams &amp; Hours
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-content" id="app-root">
+
+    <!-- Welcome View (First Run Only) -->
+    <section class="welcome-card" id="welcome-view" aria-labelledby="welcome-title">
+      <div class="welcome-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        Ready for your exams
+      </div>
+      <h2 id="welcome-title">Welcome to Rebound</h2>
+      <p>
+        University exams close together? Rebound creates a daily study schedule that gives more time to harder subjects and sooner exams. If you miss a day, it recalculates without guilt.
+      </p>
+
+      <div class="welcome-highlights">
+        <div class="highlight-item">
+          <h3>Smart Weighting</h3>
+          <p>Harder subjects and closer exams automatically get more time.</p>
+        </div>
+        <div class="highlight-item">
+          <h3>Day-Before Light Rev</h3>
+          <p>The day before each exam is protected for calm, light formula review.</p>
+        </div>
+        <div class="highlight-item">
+          <h3>Zero-Guilt Rebound</h3>
+          <p>Miss a day? Tap one button to see what moves, with full undo support.</p>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-lg" id="btn-welcome-add">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+        Add my first exam
+      </button>
+    </section>
+
+    <!-- Today View Container (Hidden until exams exist) -->
+    <section id="today-view" style="display: none;" aria-label="Today's Study Schedule"></section>
+
+    <!-- Full Plan View Container (Hidden until exams exist) -->
+    <section id="plan-view" style="display: none;" aria-label="Full Exam Study Plan"></section>
+
+  </main>
+
+  <!-- Modals Container -->
+  <div id="modal-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
