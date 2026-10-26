@@ -98,6 +98,16 @@
       this.dailyHoursInput = document.getElementById('setting-daily-hours');
       this.btnClearData = document.getElementById('btn-clear-data');
       this.modalStatusText = document.getElementById('modal-status-text');
+
+      // Missed Day Modal & Undo Toast
+      this.modalMissed = document.getElementById('modal-missed-preview');
+      this.missedPreviewContent = document.getElementById('missed-preview-content');
+      this.btnMissedClose = document.getElementById('btn-missed-close');
+      this.btnMissedCancel = document.getElementById('btn-missed-cancel');
+      this.btnMissedApply = document.getElementById('btn-missed-apply');
+      this.undoToast = document.getElementById('undo-toast');
+      this.btnUndoReplan = document.getElementById('btn-undo-replan');
+      this.btnDismissUndo = document.getElementById('btn-dismiss-undo');
     },
 
     bindEvents: function() {
@@ -135,6 +145,42 @@
           if (e.target === self.modalExams) {
             self.closeExamsModal();
           }
+        });
+      }
+
+      // Missed Day Modal Buttons
+      if (this.btnMissedClose) {
+        this.btnMissedClose.addEventListener('click', function() {
+          self.closeMissedModal();
+        });
+      }
+      if (this.btnMissedCancel) {
+        this.btnMissedCancel.addEventListener('click', function() {
+          self.closeMissedModal();
+        });
+      }
+      if (this.modalMissed) {
+        this.modalMissed.addEventListener('click', function(e) {
+          if (e.target === self.modalMissed) {
+            self.closeMissedModal();
+          }
+        });
+      }
+      if (this.btnMissedApply) {
+        this.btnMissedApply.addEventListener('click', function() {
+          self.applyMissedDay();
+        });
+      }
+
+      // Undo Toast Buttons
+      if (this.btnUndoReplan) {
+        this.btnUndoReplan.addEventListener('click', function() {
+          self.handleUndoReplan();
+        });
+      }
+      if (this.btnDismissUndo) {
+        this.btnDismissUndo.addEventListener('click', function() {
+          if (self.undoToast) self.undoToast.style.display = 'none';
         });
       }
 
@@ -742,11 +788,11 @@
         });
       });
 
-      // Hook up Missed Today button placeholder
+      // Hook up Missed Today button
       const btnMissed = this.todayView.querySelector('#btn-missed-today');
       if (btnMissed) {
         btnMissed.addEventListener('click', function() {
-          alert("Missed Today preview is coming up next in Slice 5!");
+          self.openMissedDayModal();
         });
       }
     },
@@ -870,7 +916,7 @@
         }
 
         daysHtml += `
-          <div class="timeline-day-card ${isExamDay} ${hasRevision}">
+          <div class="timeline-day-card ${isExamDay} ${hasRevision}" data-day-index="${day.dayIndex}">
             <div class="timeline-day-header">
               <span class="timeline-day-title">
                 Day ${day.dayIndex} &bull; ${day.dateString}
@@ -920,6 +966,150 @@
           self.openExamsModal();
         });
       }
+    },
+
+    openMissedDayModal: function() {
+      const plan = window.ReboundStorage.getPlan();
+      const settings = window.ReboundStorage.getSettings();
+      if (!plan || plan.length === 0) return;
+
+      const preview = window.ReboundScheduler.previewMissedDay(plan, 0, settings.dailyHours);
+      if (!preview) return;
+
+      this.currentPendingPreview = preview;
+
+      if (!preview.hasChanges) {
+        // Double-tapping safeguard / nothing to move
+        this.missedPreviewContent.innerHTML = `
+          <div class="diff-headline-box" style="background: #F0FDF4; border-color: #BBF7D0; color: #065F46;">
+            <h3 style="color: #065F46; display: flex; align-items: center; gap: 0.375rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              All Caught Up!
+            </h3>
+            <p style="color: #047857;">${escapeHtml(preview.message || 'All tasks for today are already completed or no study was scheduled! No re-planning needed.')}</p>
+          </div>
+        `;
+        if (this.btnMissedApply) this.btnMissedApply.style.display = 'none';
+        if (this.btnMissedCancel) this.btnMissedCancel.textContent = 'Close';
+      } else {
+        if (this.btnMissedApply) this.btnMissedApply.style.display = 'inline-flex';
+        if (this.btnMissedCancel) this.btnMissedCancel.textContent = 'Cancel';
+
+        let warningBannerHtml = '';
+        if (preview.warningMessage) {
+          warningBannerHtml = `
+            <div class="validation-banner show" style="background: #FFFBEB; border-color: #FCD34D; color: #92400E; margin-bottom: 0.75rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div><strong>Exam Tomorrow:</strong> ${escapeHtml(preview.warningMessage)}</div>
+            </div>
+          `;
+        }
+
+        let changedDaysHtml = '';
+        if (preview.changedDays && preview.changedDays.length > 0) {
+          changedDaysHtml = `
+            <div class="diff-container">
+              <p style="font-size: 0.8125rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: -0.25rem;">
+                Only affected days are listed below:
+              </p>
+              ${preview.changedDays.map(function(d) {
+                return `
+                  <div class="diff-day-row">
+                    <div class="diff-day-info">
+                      <span class="subject-badge badge-${d.color}">${escapeHtml(d.subject)}</span>
+                      <span class="diff-day-title">Day ${d.dayIndex} &bull; ${d.dateString}</span>
+                    </div>
+                    <div class="diff-day-hours-box">
+                      <span class="diff-before-hours">${d.beforeHours}h</span>
+                      <span class="diff-arrow">&rarr;</span>
+                      <span class="diff-after-hours">${d.afterHours}h</span>
+                      <span class="diff-badge-amber">+${d.addedHours}h ${escapeHtml(d.subject)}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          changedDaysHtml = `
+            <p style="font-size: 0.875rem; color: var(--color-text-muted); padding: 0.5rem 0;">
+              Unfinished tasks on Day 1 have been cleared.
+            </p>
+          `;
+        }
+
+        this.missedPreviewContent.innerHTML = `
+          ${warningBannerHtml}
+          <div class="diff-headline-box">
+            <h3>${escapeHtml(preview.headline)}</h3>
+            <p>Completed tasks for today remain locked as done. Only unfinished work is shifted across remaining days.</p>
+          </div>
+          ${changedDaysHtml}
+        `;
+      }
+
+      if (this.modalMissed) this.modalMissed.classList.add('open');
+    },
+
+    closeMissedModal: function() {
+      if (this.modalMissed) this.modalMissed.classList.remove('open');
+      this.currentPendingPreview = null;
+    },
+
+    applyMissedDay: function() {
+      if (!this.currentPendingPreview || !this.currentPendingPreview.newPlan) {
+        this.closeMissedModal();
+        return;
+      }
+
+      const currentPlan = window.ReboundStorage.getPlan();
+      // Save snapshot for 1-click rollback
+      window.ReboundStorage.saveUndoSnapshot(currentPlan);
+
+      // Save new plan
+      const newPlan = this.currentPendingPreview.newPlan;
+      const changedDayIndices = (this.currentPendingPreview.changedDays || []).map(function(d) { return d.dayIndex; });
+
+      window.ReboundStorage.savePlan(newPlan);
+      this.closeMissedModal();
+
+      // Show floating Undo toast
+      if (this.undoToast) {
+        this.undoToast.style.display = 'flex';
+        if (this._undoTimer) clearTimeout(this._undoTimer);
+        const self = this;
+        this._undoTimer = setTimeout(function() {
+          if (self.undoToast) self.undoToast.style.display = 'none';
+        }, 15000);
+      }
+
+      // Re-render views
+      this.render();
+
+      // Highlight changed days in Full Plan
+      if (changedDayIndices.length > 0) {
+        changedDayIndices.forEach(function(dIdx) {
+          const card = document.querySelector(`.timeline-day-card[data-day-index="${dIdx}"]`);
+          if (card) {
+            card.classList.add('highlight-amber-pulse');
+            setTimeout(function() {
+              card.classList.remove('highlight-amber-pulse');
+            }, 4500);
+          }
+        });
+      }
+    },
+
+    handleUndoReplan: function() {
+      const snapshot = window.ReboundStorage.getUndoSnapshot();
+      if (!snapshot) return;
+
+      window.ReboundStorage.savePlan(snapshot);
+      window.ReboundStorage.saveUndoSnapshot(null);
+
+      if (this.undoToast) this.undoToast.style.display = 'none';
+      this.render();
+      this.showStatus('Plan restored to previous schedule');
     },
 
     renderErrorMessage: function(msg) {

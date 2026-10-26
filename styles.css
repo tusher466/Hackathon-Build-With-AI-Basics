@@ -984,6 +984,171 @@ label {
   margin-top: 0.125rem;
 }
 
+/* ==========================================================================
+   Missed Day Preview & Diff Styles
+   ========================================================================== */
+.diff-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.diff-headline-box {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.diff-headline-box h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #92400E;
+  margin-bottom: 0.25rem;
+}
+
+.diff-headline-box p {
+  font-size: 0.8125rem;
+  color: #B45309;
+  line-height: 1.4;
+}
+
+.diff-day-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.diff-day-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.diff-day-title {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.diff-day-hours-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.diff-before-hours {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.diff-arrow {
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.diff-after-hours {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.diff-badge-amber {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Changed Day Card Highlight Pulse */
+@keyframes amberPulse {
+  0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); border-color: #F59E0B; }
+  50% { box-shadow: 0 0 0 8px rgba(217, 119, 6, 0); border-color: #FBBF24; }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); border-color: var(--border-subtle); }
+}
+
+.timeline-day-card.highlight-amber-pulse {
+  animation: amberPulse 2s ease-out 2;
+  border-left: 5px solid #F59E0B !important;
+}
+
+/* Floating Undo Toast */
+.undo-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1E293B;
+  color: #F8FAFC;
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1.25rem;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1000;
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.undo-toast-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.undo-toast-text svg {
+  color: #F59E0B;
+  flex-shrink: 0;
+}
+
+.btn-undo-action {
+  background: #334155;
+  color: #F8FAFC;
+  border: 1px solid #475569;
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-undo-action:hover {
+  background: #475569;
+  color: white;
+}
+
+.btn-icon-sm {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+}
+
+.btn-icon-sm:hover {
+  color: white;
+}
+
 /* Responsive Media Queries */
 @media (max-width: 640px) {
   .header-container {

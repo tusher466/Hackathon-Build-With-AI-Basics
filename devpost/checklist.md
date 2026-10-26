@@ -49,7 +49,7 @@ Build mode: learn
   Learner check: Switch between Today and Full Plan tabs. Tick 2 tasks on Today, watch the progress bar animate, and refresh the browser to confirm ticks persist.
   Commit: `Build Full Plan timeline view and interactive Today checklist`
 
-- [ ] **5. The Rebound moment: Missed-day diff preview, apply, and undo**
+- [x] **5. The Rebound moment: Missed-day diff preview, apply, and undo**
   Becomes usable: Tapping *"I missed today"* calculates remaining workload shifts, displays the preview modal showing only changed days with before/after hours and amber tags, commits on Apply, highlights updated days, and provides Undo.
   Why now: Implements the unique kernel of the product—the anxiety-reducing, non-punitive re-planner.
   PRD ref: `prd.md > Features and Behavior (3. 'I Missed Today' Re-Plan)`, `prd.md > Screens and Layout (5. Missed-Day Preview)`

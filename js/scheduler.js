@@ -257,14 +257,15 @@
   }
 
   // Compute preview diff when "I missed today" is triggered
-  function previewMissedDay(currentPlan, missedDayOffset) {
+  function previewMissedDay(currentPlan, missedDayOffset, dailyHours) {
     if (!currentPlan || currentPlan.length === 0) return null;
     missedDayOffset = missedDayOffset || 0;
+    dailyHours = dailyHours || 4.0;
 
     const missedDay = currentPlan.find(function(d) { return d.dayOffset === missedDayOffset; });
     if (!missedDay) return null;
 
-    // Collect unfinished tasks from missed day
+    // Collect unfinished tasks from missed day (excluding exam day placeholders and 0h tasks)
     const unfinishedTasks = missedDay.tasks.filter(function(t) {
       return !t.completed && !t.isExamDay && t.hours > 0;
     });
@@ -272,42 +273,132 @@
     if (unfinishedTasks.length === 0) {
       return {
         hasChanges: false,
-        message: "All tasks for today are already completed or no study was scheduled! No re-planning needed."
+        message: "All tasks for today are already completed! Nothing to re-plan."
       };
     }
 
-    const unfinishedHours = unfinishedTasks.reduce(function(acc, t) { return acc + t.hours; }, 0);
+    const unfinishedHours = roundToHalfHour(unfinishedTasks.reduce(function(acc, t) { return acc + t.hours; }, 0));
+    const newPlan = JSON.parse(JSON.stringify(currentPlan));
+    const newMissedDay = newPlan.find(function(d) { return d.dayOffset === missedDayOffset; });
 
-    // Compute modified plan by moving unfinished hours across subsequent active days
-    const changedDays = [];
-    let remainingToDistribute = unfinishedHours;
+    // Retain strictly completed tasks on the missed day
+    newMissedDay.tasks = newMissedDay.tasks.filter(function(t) { return t.completed; });
+    newMissedDay.totalHours = roundToHalfHour(newMissedDay.tasks.reduce(function(sum, t) { return sum + t.hours; }, 0));
 
-    // Distribute across future non-exam days
-    for (let i = missedDayOffset + 1; i < currentPlan.length; i++) {
-      const day = currentPlan[i];
-      if (!day.isExamDay && remainingToDistribute > 0) {
-        const canTake = roundToHalfHour(Math.min(0.5, remainingToDistribute));
-        if (canTake > 0) {
-          changedDays.push({
-            dayIndex: day.dayIndex,
-            dateString: day.dateString,
-            beforeHours: day.totalHours,
-            afterHours: roundToHalfHour(day.totalHours + canTake),
-            addedHours: canTake,
-            subject: unfinishedTasks[0].subject,
-            color: unfinishedTasks[0].color
+    // Check if tasks can be rescheduled before exams
+    let unplacedHours = 0;
+    const changedDaysMap = {};
+
+    unfinishedTasks.forEach(function(task) {
+      let hoursLeft = task.hours;
+
+      // Pass 1: Place in days with spare capacity (totalHours < dailyHours)
+      for (let i = missedDayOffset + 1; i < newPlan.length; i++) {
+        const d = newPlan[i];
+        if (hoursLeft <= 0) break;
+
+        // Cannot place on or after exam day for this subject
+        const hasSubjectExam = d.tasks.some(function(t) { return t.examId === task.examId && t.isExamDay; });
+        const hasSubjectRev = d.tasks.some(function(t) { return t.examId === task.examId && t.isRevision; });
+        if (hasSubjectExam || hasSubjectRev) continue;
+
+        const spare = roundToHalfHour(Math.max(0, dailyHours - d.totalHours));
+        if (spare >= 0.5) {
+          const canTake = roundToHalfHour(Math.min(spare, hoursLeft, 1.0));
+          d.tasks.push({
+            id: 'task_' + d.dayIndex + '_' + task.examId + '_rebound',
+            examId: task.examId,
+            subject: task.subject,
+            color: task.color,
+            chapters: task.chapters,
+            hours: canTake,
+            completed: false,
+            isRevision: false,
+            isExamDay: false,
+            isReboundAdded: true
           });
-          remainingToDistribute = roundToHalfHour(remainingToDistribute - canTake);
+          d.totalHours = roundToHalfHour(d.totalHours + canTake);
+          hoursLeft = roundToHalfHour(hoursLeft - canTake);
+          changedDaysMap[d.dayIndex] = {
+            subject: task.subject,
+            color: task.color
+          };
         }
       }
+
+      // Pass 2: If still remaining, distribute in 0.5h increments to active pre-exam days
+      if (hoursLeft > 0) {
+        for (let i = missedDayOffset + 1; i < newPlan.length; i++) {
+          const d = newPlan[i];
+          if (hoursLeft <= 0) break;
+          const hasSubjectExam = d.tasks.some(function(t) { return t.examId === task.examId && t.isExamDay; });
+          if (hasSubjectExam) continue;
+
+          const canTake = roundToHalfHour(Math.min(0.5, hoursLeft));
+          d.tasks.push({
+            id: 'task_' + d.dayIndex + '_' + task.examId + '_rebound',
+            examId: task.examId,
+            subject: task.subject,
+            color: task.color,
+            chapters: task.chapters,
+            hours: canTake,
+            completed: false,
+            isRevision: false,
+            isExamDay: false,
+            isReboundAdded: true
+          });
+          d.totalHours = roundToHalfHour(d.totalHours + canTake);
+          hoursLeft = roundToHalfHour(hoursLeft - canTake);
+          changedDaysMap[d.dayIndex] = {
+            subject: task.subject,
+            color: task.color
+          };
+        }
+      }
+
+      if (hoursLeft > 0) {
+        unplacedHours += hoursLeft;
+      }
+    });
+
+    // Build changed days diff list
+    const changedDays = [];
+    newPlan.forEach(function(d) {
+      const oldD = currentPlan.find(function(od) { return od.dayIndex === d.dayIndex; });
+      if (oldD && d.dayIndex !== missedDay.dayIndex && d.totalHours !== oldD.totalHours) {
+        const added = roundToHalfHour(d.totalHours - oldD.totalHours);
+        const meta = changedDaysMap[d.dayIndex] || { subject: unfinishedTasks[0].subject, color: unfinishedTasks[0].color };
+        changedDays.push({
+          dayIndex: d.dayIndex,
+          dateString: d.dateString,
+          beforeHours: oldD.totalHours,
+          afterHours: d.totalHours,
+          addedHours: added,
+          subject: meta.subject,
+          color: meta.color
+        });
+      }
+    });
+
+    let headline = `Moved ${unfinishedHours}h of unfinished work across remaining days`;
+    if (unfinishedTasks.length === 1) {
+      headline = `Moved ${unfinishedHours}h of unfinished ${unfinishedTasks[0].subject} work across remaining days`;
+    }
+
+    let warningMessage = null;
+    if (unplacedHours > 0) {
+      warningMessage = `Exam cutoff: ${unplacedHours}h of study could not be rescheduled because your exam date is tomorrow. Exam days are strictly protected for 0h study.`;
     }
 
     return {
-      hasChanges: true,
-      headline: `Moved ${unfinishedHours}h of unfinished work across remaining days`,
+      hasChanges: changedDays.length > 0 || newMissedDay.totalHours !== missedDay.totalHours,
+      headline: headline,
       missedDayIndex: missedDay.dayIndex,
+      unfinishedHours: unfinishedHours,
+      unplacedHours: unplacedHours,
+      warningMessage: warningMessage,
       changedDays: changedDays,
-      unfinishedHours: unfinishedHours
+      newPlan: newPlan
     };
   }
 

@@ -176,6 +176,46 @@
         </div>
       </div>
     </div>
+
+    <!-- Missed Day Preview Modal -->
+    <div class="modal-backdrop" id="modal-missed-preview" role="dialog" aria-modal="true" aria-labelledby="modal-missed-title">
+      <div class="modal-dialog" style="max-width: 520px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--color-accent-amber-light); color: var(--color-accent-amber); display: flex; align-items: center; justify-content: center; font-size: 0.875rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </div>
+            <h2 id="modal-missed-title" style="font-size: 1.125rem;">Rebound Preview</h2>
+          </div>
+          <button type="button" class="btn-icon" id="btn-missed-close" aria-label="Close dialog">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div id="missed-preview-content">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-missed-cancel">Cancel</button>
+          <button type="button" class="btn btn-amber" id="btn-missed-apply">Apply Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Undo Notification -->
+  <div id="undo-toast" class="undo-toast" style="display: none;" role="status" aria-live="polite">
+    <div class="undo-toast-text">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      <span>Study plan updated.</span>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <button type="button" class="btn-undo-action" id="btn-undo-replan">Undo Re-Plan</button>
+      <button type="button" class="btn-icon-sm" id="btn-dismiss-undo" aria-label="Dismiss">&times;</button>
+    </div>
   </div>
 
   <!-- Scripts -->
