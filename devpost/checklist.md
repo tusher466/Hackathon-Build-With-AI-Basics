@@ -19,7 +19,7 @@ Build mode: learn
   Learner check: Open the browser at `http://localhost:8000` (or `npx serve`) and verify the clean, calm greeting and *"Add my first exam"* button.
   Commit: `Scaffold project and create welcome screen with design system`
 
-- [ ] **2. LocalStorage persistence and exam management modal**
+- [x] **2. LocalStorage persistence and exam management modal**
   Becomes usable: Clicking *"Add my first exam"* opens a modal where you can add, edit, and delete exams with dates, chapters, and difficulty, plus set daily study hours. Data survives page refreshes.
   Why now: Data entry and persistence are the foundation for the entire scheduling engine; proving localStorage now prevents data bugs later.
   PRD ref: `prd.md > Screens and Layout (2. Add / Edit Exams)`, `prd.md > States and Boundaries`
