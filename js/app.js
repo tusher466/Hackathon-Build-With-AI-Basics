@@ -5,8 +5,8 @@
 (function(window, document) {
   'use strict';
 
-  // Subject color palette cycle
-  const COLOR_PALETTE = ['indigo', 'teal', 'emerald', 'amber'];
+  // Subject color palette cycle (distinct: green reserved for done, amber for diffs, teal for app)
+  const COLOR_PALETTE = ['indigo', 'violet', 'sky', 'rose'];
 
   // Utility: Date parsing with NO timezone shift
   function parseDateString(str) {
@@ -315,12 +315,22 @@
         return;
       }
 
-      // Assign subject color
-      const existingExams = window.ReboundStorage.getExams();
+      // Assign subject color: Calculus -> indigo, Physics -> violet, Economics -> sky, or cycle
+      const lowerName = name.toLowerCase();
       let color = 'indigo';
-      if (id) {
+      if (lowerName.includes('calc')) {
+        color = 'indigo';
+      } else if (lowerName.includes('phys')) {
+        color = 'violet';
+      } else if (lowerName.includes('econ')) {
+        color = 'sky';
+      } else if (id) {
         const current = existingExams.find(e => e.id === id);
-        if (current && current.color) color = current.color;
+        if (current && current.color && current.color !== 'teal' && current.color !== 'emerald' && current.color !== 'amber') {
+          color = current.color;
+        } else {
+          color = COLOR_PALETTE[existingExams.length % COLOR_PALETTE.length];
+        }
       } else {
         color = COLOR_PALETTE[existingExams.length % COLOR_PALETTE.length];
       }
@@ -407,10 +417,24 @@
 
       let html = '';
       const self = this;
+  function getSubjectBadgeColor(exam) {
+    if (!exam) return 'indigo';
+    const lower = (exam.name || '').toLowerCase();
+    if (lower.includes('calc')) return 'indigo';
+    if (lower.includes('phys')) return 'violet';
+    if (lower.includes('econ')) return 'sky';
+    if (exam.color === 'violet' || exam.color === 'rose' || exam.color === 'sky' || exam.color === 'indigo') {
+      return exam.color;
+    }
+    if (exam.color === 'teal') return 'violet';
+    if (exam.color === 'emerald') return 'sky';
+    return 'indigo';
+  }
+
       exams.forEach(function(exam) {
         const days = getDaysFromToday(exam.date);
         const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
-        const badgeClass = 'badge-' + (exam.color || 'indigo');
+        const badgeClass = 'badge-' + getSubjectBadgeColor(exam);
 
         html += `
           <div class="exam-card-item" data-id="${exam.id}">
@@ -504,7 +528,7 @@
       exams.forEach(function(exam) {
         const days = getDaysFromToday(exam.date);
         const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
-        const badgeClass = 'badge-' + (exam.color || 'indigo');
+        const badgeClass = 'badge-' + getSubjectBadgeColor(exam);
         examsSummaryHtml += `
           <div class="exam-card-item">
             <div class="exam-info">
@@ -569,7 +593,7 @@
       sortedExams.forEach(function(exam) {
         const days = getDaysFromToday(exam.date);
         const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
-        const badgeClass = 'badge-' + (exam.color || 'indigo');
+        const badgeClass = 'badge-' + getSubjectBadgeColor(exam);
         timelineHtml += `
           <div class="exam-card-item">
             <div class="exam-info">

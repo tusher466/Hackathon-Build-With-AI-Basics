@@ -71,7 +71,7 @@ Build mode: learn
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — Slice 2 (Exams entered and persisted in localStorage)
+- [x] Early usable behavior explored — Slice 2 (Exams entered and persisted in localStorage)
 - [ ] Final kick-the-tires exploration and feedback completed — Slice 6 (Full 2-minute demo dry run)
 
 ## Final Review

@@ -27,13 +27,22 @@
   --border-subtle: #E2E8F0;
   --border-medium: #CBD5E1;
   
-  /* Subject Accent Colors */
-  --color-calc: #4F46E5;
-  --bg-calc: #EEF2FF;
-  --color-phys: #0D9488;
-  --bg-phys: #CCFBF1;
-  --color-econ: #059669;
-  --bg-econ: #D1FAE5;
+  /* Subject Accent Colors (Distinct: green reserved for done, amber for diffs, teal for app) */
+  --color-indigo: #4F46E5;
+  --bg-indigo: #EEF2FF;
+  --border-indigo: #C7D2FE;
+  
+  --color-violet: #7C3AED;
+  --bg-violet: #F5F3FF;
+  --border-violet: #DDD6FE;
+  
+  --color-sky: #0284C7;
+  --bg-sky: #E0F2FE;
+  --border-sky: #BAE6FD;
+
+  --color-rose: #E11D48;
+  --bg-rose: #FFE4E6;
+  --border-rose: #FECDD3;
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -519,23 +528,34 @@ label {
 }
 
 .subject-badge.badge-indigo {
-  background: var(--bg-calc);
-  color: var(--color-calc);
+  background: var(--bg-indigo);
+  color: var(--color-indigo);
+  border: 1px solid var(--border-indigo);
 }
 
-.subject-badge.badge-teal {
-  background: var(--bg-phys);
-  color: var(--color-phys);
+.subject-badge.badge-violet {
+  background: var(--bg-violet);
+  color: var(--color-violet);
+  border: 1px solid var(--border-violet);
 }
 
-.subject-badge.badge-emerald {
-  background: var(--bg-econ);
-  color: var(--color-econ);
+.subject-badge.badge-sky {
+  background: var(--bg-sky);
+  color: var(--color-sky);
+  border: 1px solid var(--border-sky);
 }
 
-.subject-badge.badge-amber {
+.subject-badge.badge-rose {
+  background: var(--bg-rose);
+  color: var(--color-rose);
+  border: 1px solid var(--border-rose);
+}
+
+/* Amber is strictly reserved for changed/added time diffs */
+.badge-diff-amber {
   background: var(--color-accent-amber-light);
   color: var(--color-accent-amber);
+  border: 1px solid var(--color-accent-amber-border);
 }
 
 .exam-details {
