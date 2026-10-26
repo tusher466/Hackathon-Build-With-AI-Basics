@@ -29,7 +29,7 @@ Build mode: learn
   Learner check: Open the app, add Calculus (6d, 8ch, diff 4), Physics (8d, 6ch, diff 5), and Economics (10d, 5ch, diff 2). Refresh the page and confirm all 3 cards remain in the list.
   Commit: `Implement exam management modal and localStorage persistence`
 
-- [ ] **3. Pure scheduling engine and worked example verification**
+- [x] **3. Pure scheduling engine and worked example verification**
   Becomes usable: The pure mathematical algorithm that calculates weighted study allocations, enforces the day-before light revision cap (1.0h), handles exam day cutoffs, and calculates shortfall.
   Why now: Risk-first engineering: verifying the core mathematics against the worked example before wiring complex UI interactions guarantees the numbers on screen will be 100% accurate.
   PRD ref: `prd.md > Features and Behavior (1. Weighted Plan Generation)`, `prd.md > Features and Behavior (4. Shortfall Calculation)`
