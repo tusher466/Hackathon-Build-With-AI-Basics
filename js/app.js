@@ -1076,7 +1076,11 @@
                 ${plan.length} total days &bull; ${totalPlannedHours.toFixed(1)} planned study hours &bull; Target ${settings.dailyHours}h/day
               </p>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btn-export-calendar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14v4"/><path d="m10 16 2 2 2-2"/></svg>
+                Add to my calendar
+              </button>
               <button type="button" class="btn btn-secondary" id="btn-replan-all">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 Edit Exams &amp; Hours
@@ -1091,11 +1095,46 @@
         </div>
       `;
 
+      const btnExport = this.planView.querySelector('#btn-export-calendar');
+      if (btnExport) {
+        btnExport.addEventListener('click', function() {
+          self.exportPlanToCalendar();
+        });
+      }
+
       const btnEdit = this.planView.querySelector('#btn-replan-all');
       if (btnEdit) {
         btnEdit.addEventListener('click', function() {
           self.openExamsModal();
         });
+      }
+    },
+
+    exportPlanToCalendar: function() {
+      const plan = window.ReboundStorage.getPlan();
+      const icsString = window.ReboundScheduler.generateICS(plan);
+
+      if (!icsString) {
+        this.showStatus('All tasks are already completed! Nothing to export to calendar.');
+        return;
+      }
+
+      try {
+        const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'rebound-plan.ics';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() {
+          URL.revokeObjectURL(url);
+        }, 1000);
+        this.showStatus('Downloaded rebound-plan.ics');
+      } catch (err) {
+        console.error('Calendar export error:', err);
+        this.showStatus('Could not export calendar file.');
       }
     },
 

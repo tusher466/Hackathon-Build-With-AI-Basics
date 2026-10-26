@@ -577,6 +577,90 @@
     return null;
   }
 
+  function escapeIcsText(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\r?\n/g, '\\n');
+  }
+
+  function formatIcsDate(isoDateStr) {
+    return isoDateStr.replace(/-/g, '');
+  }
+
+  function getNextDayIcsDate(isoDateStr) {
+    const parts = isoDateStr.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  }
+
+  // Pure iCalendar (.ics) Generator (RFC 5545 compliant)
+  function generateICS(plan) {
+    if (!plan || !Array.isArray(plan) || plan.length === 0) return null;
+
+    let hasEvents = false;
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Rebound//Study Planner//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:Rebound Study Plan'
+    ];
+
+    const nowTimestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+    plan.forEach(function(day) {
+      if (!day.tasks || !day.date) return;
+      const startDate = formatIcsDate(day.date);
+      const endDate = getNextDayIcsDate(day.date);
+
+      day.tasks.forEach(function(t, idx) {
+        // Skip tasks already ticked as completed
+        if (t.completed) return;
+
+        let title = '';
+        let description = '';
+
+        if (t.isExamDay) {
+          title = `EXAM: ${t.subject}`;
+          description = `Exam Day: ${t.subject}`;
+        } else if (t.isRevision) {
+          title = `${t.subject}: Light revision (${t.hours}h)`;
+          description = `Light formula and concept revision for ${t.subject}`;
+        } else {
+          title = `${t.subject}: ${t.chapters} (${t.hours}h)`;
+          description = `Study session for ${t.subject}`;
+        }
+
+        hasEvents = true;
+        const uid = `rebound-${day.dayIndex}-${t.id || idx}-${day.date}@rebound.app`;
+
+        lines.push('BEGIN:VEVENT');
+        lines.push(`UID:${uid}`);
+        lines.push(`DTSTAMP:${nowTimestamp}`);
+        lines.push(`DTSTART;VALUE=DATE:${startDate}`);
+        lines.push(`DTEND;VALUE=DATE:${endDate}`);
+        lines.push(`SUMMARY:${escapeIcsText(title)}`);
+        lines.push(`DESCRIPTION:${escapeIcsText(description)}`);
+        lines.push('STATUS:CONFIRMED');
+        lines.push('TRANSP:TRANSPARENT');
+        lines.push('END:VEVENT');
+      });
+    });
+
+    if (!hasEvents) return null;
+
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n') + '\r\n';
+  }
+
   window.ReboundScheduler = {
     HOURS_PER_CHAPTER: HOURS_PER_CHAPTER,
     roundToHalfHour: roundToHalfHour,
@@ -584,7 +668,8 @@
     generatePlan: generatePlan,
     previewMissedDay: previewMissedDay,
     simulateForecast: simulateForecast,
-    findMinimumDailyHours: findMinimumDailyHours
+    findMinimumDailyHours: findMinimumDailyHours,
+    generateICS: generateICS
   };
 
 })(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this));

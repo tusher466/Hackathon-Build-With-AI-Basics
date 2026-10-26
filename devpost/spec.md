@@ -285,6 +285,18 @@ The what-if simulator is a pure function `simulateForecast(exams, currentPlan, s
   - If not achievable even at 12.0h: returns `null`, displaying a calm note explaining which subject is trimmed first based on existing shortfall priority.
 - **State Separation Guarantee:** Zero side-effects; never touches `localStorage` or mutating app variables during slider changes.
 
+### 7. Calendar Export Rules (iCalendar RFC 5545)
+Pure function `generateICS(plan)` converts the active study schedule into an iCalendar (`.ics`) file for browser download:
+- **Filtering:** Skips any task where `completed: true`.
+- **Event Titles:**
+  - Regular study task: `"[Subject]: [Chapters] ([Hours]h)"` (e.g., `"Calculus: Chapters 1-2 (2h)"`).
+  - Light revision task: `"[Subject]: Light revision ([Hours]h)"`.
+  - Exam day placeholder: `"EXAM: [Subject]"`.
+- **Description:** Set to the subject name and study context.
+- **Dates:** Stored as all-day events using `DTSTART;VALUE=DATE:YYYYMMDD` and `DTEND;VALUE=DATE:YYYYMMDD` (next day) to prevent time zone shifts or midnight drift across calendar apps.
+- **Format:** Strict RFC 5545 compliance with CRLF (`\r\n`) line endings, unique `UID` per event, and character escaping for `,` and `;`.
+- **Empty State:** If all tasks are completed or no tasks exist, returns `null` so the UI displays an encouraging message instead of generating an empty file.
+
 ---
 
 ## Worked Example: Day-by-Day Walkthrough
@@ -457,4 +469,8 @@ Every slice produces an immediately runnable, verifiable deliverable:
 7. **Slice 7: Reality Check Forecast (What-If Simulator) (`js/scheduler.js`, `js/app.js`, `styles.css`)**
    - Pure forecast simulation function, 3-tab navigation with mobile-friendly Forecast tab, subject coverage cards with progress bars and non-amber status badges (On track / Tight / Behind), 1–10h interactive slider with instant updates, comparison note, and "Use X hours/day" confirmation modal.
    - *How to verify:* Open Forecast tab with the demo exams. Verify clean start numbers match the spec table (3.5h minimum, 4h fits cleanly with 100% On track, 2h shows 10h shortfall). Drag slider from 2 to 6; observe instantaneous updates without plan alteration. Tick 2 tasks on Day 1, reopen Forecast, verify remaining needed drops to 25.5h and minimum needed becomes 3.0h. Click "Use 5h/day", confirm dialog, verify plan updates while ticked tasks stay intact.
+8. **Slice 8: Calendar Export (.ics) (`js/scheduler.js`, `js/app.js`, `styles.css`)**
+   - Pure `generateICS(plan)` function, "Add to my calendar" button on Full Plan timeline header, automatic omission of ticked tasks, all-day RFC 5545 events, and friendly notice when all tasks are complete.
+   - *How to verify:* Generate demo plan, click "Add to my calendar", download `rebound-plan.ics`. Open in text editor, inspect VCALENDAR structure, event UIDs, SUMMARY strings, and date boundaries. Tick all tasks on Day 1, export again and confirm completed tasks are excluded.
+
 

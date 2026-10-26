@@ -79,6 +79,16 @@ Build mode: learn
   Learner check: Open Forecast tab. Confirm cards show 100% On track at 4h/day. Drag slider to 2h/day and verify live update to Tight/Behind and 10h short without saving to localStorage. Verify "The minimum you need" sentence says 3.5 hours/day. Click "Use 5.0 hours/day", click Cancel, click again and Apply, and verify plan updates with existing ticked tasks preserved.
   Commit: `Implement Reality Check Forecast what-if simulator and minimum hours calculator`
 
+- [x] **8. Calendar Export (.ics)**
+  Becomes usable: A button on the Full Plan screen, "Add to my calendar", generates and downloads `rebound-plan.ics`. Unticked study sessions become all-day calendar events with clear titles, light-revision designations, exam day events, and subject descriptions. Completed tasks are omitted, and format follows RFC 5545.
+  Why now: Enables seamless transfer of the study plan to external calendar clients (Google Calendar, Outlook, Apple Calendar) without backend dependencies.
+  PRD ref: `prd.md > Features and Behavior (7. Calendar Export)`
+  Spec ref: `spec.md > Scheduling Rules (7. Calendar Export Rules)`, `spec.md > Ordered Build Slices (8. Slice 8)`
+  Build: Implement pure function `scheduler.generateICS(plan)`, download helper, and "Add to my calendar" button on the Full Plan header.
+  Verify (mechanical): Generate ICS from demo plan, assert valid VCALENDAR headers, CRLF line endings, correct event summaries, and exclusion of completed tasks.
+  Learner check: Click "Add to my calendar", inspect downloaded `rebound-plan.ics` in a text editor to verify event dates and titles.
+  Commit: `Implement iCalendar .ics plan export for Full Plan view`
+
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — Slice 2 (Exams entered and persisted in localStorage)

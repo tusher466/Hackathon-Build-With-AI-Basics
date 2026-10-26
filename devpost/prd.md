@@ -9,7 +9,9 @@ status: approved
 > 
 > Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`
 > 
-> **Change log:** Feature *"Reality Check Forecast"* added after Slice 6 to provide proactive what-if simulation, letting students explore "what would it take?" before committing hours.
+> **Change log:** 
+> - Feature *"Reality Check Forecast"* added after Slice 6 to provide proactive what-if simulation, letting students explore "what would it take?" before committing hours.
+> - Feature *"Add to Calendar (.ics export)"* added after Slice 7 to enable offline calendar integration directly from Full Plan.
 
 Rebound is an intelligent, stress-reducing study planner for university students managing overlapping exam periods. It balances study workloads based on exam urgency and subject difficulty, and features a gentle, transparent re-planning preview that recalculates and visualizes shifts whenever a day of study is missed.
 
@@ -150,6 +152,22 @@ The application consists of a single responsive web interface with a top segment
   - [ ] Clicking "Use X hours/day" and confirming updates the saved hours setting and regenerates the schedule while preserving all checked tasks.
   - [ ] Clicking Cancel in confirmation leaves the plan and saved settings completely unchanged.
   - [ ] "Use X hours/day" button is disabled when slider equals current setting.
+
+### 7. Calendar Export (.ics)
+- **What it does:** Allows students to download their study schedule as a standard iCalendar (`.ics`) file to import into Google Calendar, Apple Calendar, or Outlook.
+- **Behavior:**
+  - Clicking *"Add to my calendar"* on the Full Plan header creates and downloads `rebound-plan.ics`.
+  - Each task becomes an all-day event on its planned calendar date.
+  - Regular tasks: titled like `"[Subject]: [Chapters] ([Hours]h)"` (e.g. `"Calculus: Chapters 1-2 (1.5h)"`), with subject in description.
+  - Light revision days: titled `"[Subject]: Light revision ([Hours]h)"`.
+  - Exam days: titled `"EXAM: [Subject]"`.
+  - Completed tasks: skipped automatically so past/finished tasks don't clutter the calendar.
+  - Empty state: if all tasks are done or no plan exists, shows a friendly message instead of downloading an empty file.
+- **Acceptance Criteria:**
+  - [ ] Clicking *"Add to my calendar"* downloads `rebound-plan.ics`.
+  - [ ] File follows RFC 5545 format with valid line endings (CRLF), UIDs, and escaped characters.
+  - [ ] Tasks already checked off are omitted from the export.
+  - [ ] Friendly toast/message appears when all tasks are finished with nothing to export.
 
 ---
 
