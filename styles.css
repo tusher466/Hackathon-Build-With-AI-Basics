@@ -185,7 +185,7 @@ body {
   border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--transition-fast);
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .btn-primary {
@@ -437,6 +437,10 @@ label {
   color: var(--color-text-secondary);
   text-align: center;
   transition: all var(--transition-fast);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .diff-btn:hover {
@@ -584,7 +588,7 @@ label {
 .btn-icon {
   background: transparent;
   border: none;
-  padding: 0.375rem;
+  padding: 0.5rem;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   cursor: pointer;
@@ -592,6 +596,8 @@ label {
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .btn-icon:hover {
@@ -889,6 +895,8 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .task-checkbox {
@@ -1163,6 +1171,24 @@ label {
   
   .nav-pills {
     justify-content: center;
+    width: 100%;
+  }
+
+  .nav-pill {
+    flex: 1;
+    text-align: center;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-actions {
+    justify-content: center;
+  }
+
+  .header-actions .btn {
+    width: 100%;
   }
 
   .welcome-highlights {
@@ -1176,5 +1202,70 @@ label {
   .welcome-card {
     padding: 2.25rem 1.25rem;
     margin: 1rem auto;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .modal-dialog {
+    max-width: calc(100vw - 1.25rem);
+    margin: 0.625rem auto;
+    border-radius: var(--radius-md);
+  }
+
+  .modal-body {
+    padding: 1.125rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.125rem;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .modal-footer-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .modal-footer-actions .btn {
+    flex: 1;
+  }
+
+  .today-meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+
+  .plan-header-box {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .plan-header-box .btn {
+    width: 100%;
+  }
+
+  .diff-day-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .diff-day-hours-box {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .undo-toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    flex-direction: row;
+    justify-content: space-between;
   }
 }

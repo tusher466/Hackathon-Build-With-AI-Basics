@@ -59,7 +59,7 @@ Build mode: learn
   Learner check: Leave Economics unticked on Day 1, click *"I missed today"*, inspect the amber preview diff, click *"Apply"*, see changed days highlighted in the full plan, then click *"Undo"* to verify rollback.
   Commit: `Implement missed-day diff preview modal, apply commit, and undo support`
 
-- [ ] **6. Reality check shortfall alert and mobile responsive polish**
+- [x] **6. Reality check shortfall alert and mobile responsive polish**
   Becomes usable: Lowering daily hours triggers the calm shortfall alert explaining the exact hour deficit and trimmed chapters; the entire UI is optimized and responsive down to mobile viewports.
   Why now: Final integration slice: satisfies the remaining demo script steps (reality check and mobile width) before final review.
   PRD ref: `prd.md > Screens and Layout (6. Reality Check Alert)`, `prd.md > Demo Script Outline`

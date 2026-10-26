@@ -65,7 +65,8 @@
       if (days > maxDays) maxDays = days;
     });
 
-    const totalCapacity = (maxDays + 1) * dailyHours;
+    const totalStudyDays = Math.max(1, maxDays);
+    const totalCapacity = totalStudyDays * dailyHours;
     if (totalNeeded > totalCapacity) {
       const deficit = roundToHalfHour(totalNeeded - totalCapacity);
       return {
