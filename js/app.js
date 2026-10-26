@@ -462,24 +462,178 @@
     },
 
     render: function() {
-      const exams = window.ReboundStorage.getExams();
+      try {
+        const exams = window.ReboundStorage.getExams();
+        const settings = window.ReboundStorage.getSettings();
 
-      // View state routing:
-      // If no exams exist -> always show Welcome view
-      if (exams.length === 0) {
-        if (this.welcomeView) this.welcomeView.style.display = 'block';
-        if (this.todayView) this.todayView.style.display = 'none';
-        if (this.planView) this.planView.style.display = 'none';
-      } else {
+        // 1. If no exams exist -> show Welcome view, hide other tabs
+        if (exams.length === 0) {
+          if (this.welcomeView) this.welcomeView.style.display = 'block';
+          if (this.todayView) this.todayView.style.display = 'none';
+          if (this.planView) this.planView.style.display = 'none';
+          return;
+        }
+
+        // 2. If exams exist -> hide Welcome view
         if (this.welcomeView) this.welcomeView.style.display = 'none';
+
+        // 3. Render active tab
         if (this.currentView === 'today') {
-          if (this.todayView) this.todayView.style.display = 'block';
+          if (this.todayView) {
+            this.todayView.style.display = 'block';
+            this.renderTodayPlaceholder(exams, settings);
+          }
           if (this.planView) this.planView.style.display = 'none';
         } else {
           if (this.todayView) this.todayView.style.display = 'none';
-          if (this.planView) this.planView.style.display = 'block';
+          if (this.planView) {
+            this.planView.style.display = 'block';
+            this.renderPlanPlaceholder(exams, settings);
+          }
         }
+      } catch (err) {
+        console.error('Render error caught gracefully:', err);
+        this.renderErrorMessage('Something unexpected happened, but your data is safe in your browser.');
       }
+    },
+
+    renderTodayPlaceholder: function(exams, settings) {
+      if (!this.todayView) return;
+      const self = this;
+      let examsSummaryHtml = '';
+      exams.forEach(function(exam) {
+        const days = getDaysFromToday(exam.date);
+        const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
+        const badgeClass = 'badge-' + (exam.color || 'indigo');
+        examsSummaryHtml += `
+          <div class="exam-card-item">
+            <div class="exam-info">
+              <span class="subject-badge ${badgeClass}">${escapeHtml(exam.name)}</span>
+              <div class="exam-details">
+                <span class="exam-title">${escapeHtml(exam.name)} &bull; ${exam.chapters} chapters &bull; Difficulty ${exam.difficulty}/5</span>
+                <span class="exam-subtext">${exam.date} (${dayLabel})</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      this.todayView.innerHTML = `
+        <div class="welcome-card" style="margin: 1.5rem auto; text-align: left; max-width: 680px; padding: 2.5rem 2rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="welcome-badge" style="margin-bottom: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Exams Saved (${exams.length})
+            </div>
+            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-light); padding: 0.25rem 0.625rem; border-radius: var(--radius-full);">
+              Target: ${settings.dailyHours || 4.0} hrs/day
+            </span>
+          </div>
+
+          <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Your exams are saved!</h2>
+          <p style="font-size: 0.95rem; line-height: 1.5; color: var(--color-text-muted); margin-bottom: 1.25rem;">
+            Your daily study tasks will appear here once the study plan is generated. Here are your saved subjects:
+          </p>
+
+          <div class="exams-list" style="margin-bottom: 1.75rem;">
+            ${examsSummaryHtml}
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary" id="btn-today-open-exams">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Manage Exams &amp; Hours
+            </button>
+          </div>
+        </div>
+      `;
+
+      const btn = this.todayView.querySelector('#btn-today-open-exams');
+      if (btn) {
+        btn.addEventListener('click', function() {
+          self.openExamsModal();
+        });
+      }
+    },
+
+    renderPlanPlaceholder: function(exams, settings) {
+      if (!this.planView) return;
+      const self = this;
+      
+      // Sort exams by date ascending
+      const sortedExams = exams.slice().sort(function(a, b) {
+        return getDaysFromToday(a.date) - getDaysFromToday(b.date);
+      });
+
+      let timelineHtml = '';
+      sortedExams.forEach(function(exam) {
+        const days = getDaysFromToday(exam.date);
+        const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
+        const badgeClass = 'badge-' + (exam.color || 'indigo');
+        timelineHtml += `
+          <div class="exam-card-item">
+            <div class="exam-info">
+              <span class="subject-badge ${badgeClass}">${escapeHtml(exam.name)}</span>
+              <div class="exam-details">
+                <span class="exam-title">${escapeHtml(exam.name)} &bull; Exam Day: ${exam.date} (${dayLabel})</span>
+                <span class="exam-subtext">${exam.chapters} chapters &bull; Difficulty ${exam.difficulty}/5</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      this.planView.innerHTML = `
+        <div class="welcome-card" style="margin: 1.5rem auto; text-align: left; max-width: 680px; padding: 2.5rem 2rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="welcome-badge" style="margin-bottom: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Full Plan Overview
+            </div>
+            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-light); padding: 0.25rem 0.625rem; border-radius: var(--radius-full);">
+              ${settings.dailyHours || 4.0} hrs/day
+            </span>
+          </div>
+
+          <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Study Plan Timeline</h2>
+          <p style="font-size: 0.95rem; line-height: 1.5; color: var(--color-text-muted); margin-bottom: 1.25rem;">
+            Your full day-by-day study schedule and light revision milestones will appear here. Upcoming exam deadlines:
+          </p>
+
+          <div class="exams-list" style="margin-bottom: 1.75rem;">
+            ${timelineHtml}
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary" id="btn-plan-open-exams">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Manage Exams &amp; Hours
+            </button>
+          </div>
+        </div>
+      `;
+
+      const btn = this.planView.querySelector('#btn-plan-open-exams');
+      if (btn) {
+        btn.addEventListener('click', function() {
+          self.openExamsModal();
+        });
+      }
+    },
+
+    renderErrorMessage: function(msg) {
+      const root = document.getElementById('app-root');
+      if (!root) return;
+      root.innerHTML = `
+        <div class="welcome-card" style="max-width: 540px; margin: 3rem auto; text-align: center;">
+          <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem; color: #DC2626;">We encountered a small hiccup</h2>
+          <p style="font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 1.5rem;">${escapeHtml(msg)}</p>
+          <div style="display: flex; gap: 0.5rem; justify-content: center;">
+            <button type="button" class="btn btn-secondary" onclick="window.location.reload()">Reload Page</button>
+            <button type="button" class="btn btn-primary" onclick="window.ReboundApp.openExamsModal()">Manage Exams</button>
+          </div>
+        </div>
+      `;
     }
   };
 
