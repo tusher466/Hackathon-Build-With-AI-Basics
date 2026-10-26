@@ -39,7 +39,7 @@ Build mode: learn
   Learner check: Review the automated test output confirming Day 5 has Calculus light revision, Day 6 has 0h Calculus, Day 7 has Physics light revision, and Day 8 has 0h Physics.
   Commit: `Implement weighted scheduling engine and light revision logic`
 
-- [ ] **4. Full plan timeline view and Today screen checklist**
+- [x] **4. Full plan timeline view and Today screen checklist**
   Becomes usable: The main daily workspace. A student sees the full 10-day timeline with subject color tags and light revision badges, plus the Today screen showing Day 1 tasks with checkboxes, countdown badge, and a real-time progress bar.
   Why now: Delivers the core student workflow: viewing the plan and ticking off daily tasks.
   PRD ref: `prd.md > Screens and Layout (3. Today View)`, `prd.md > Screens and Layout (4. Full Plan View)`

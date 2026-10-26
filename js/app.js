@@ -41,6 +41,16 @@
     return formatDateToISO(d);
   }
 
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+    const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+    return `${dayName}, ${d.getDate()} ${monthName}`;
+  }
+
   // App State & DOM Elements
   const App = {
     currentView: 'today',
@@ -183,6 +193,12 @@
             this.value = '16';
           }
           window.ReboundStorage.saveSettings({ dailyHours: hours });
+          const allExams = window.ReboundStorage.getExams();
+          if (allExams.length > 0) {
+            const updatedPlan = window.ReboundScheduler.generatePlan(allExams, hours);
+            window.ReboundStorage.savePlan(updatedPlan);
+          }
+          self.render();
           self.showStatus('Saved daily hours: ' + hours + ' hrs/day');
         });
       }
@@ -349,6 +365,13 @@
       }
 
       window.ReboundStorage.saveExam(examData);
+      
+      // Automatically re-generate plan on exam change
+      const allExams = window.ReboundStorage.getExams();
+      const currentSettings = window.ReboundStorage.getSettings();
+      const newPlan = window.ReboundScheduler.generatePlan(allExams, currentSettings.dailyHours);
+      window.ReboundStorage.savePlan(newPlan);
+
       this.showStatus('Saved ' + name + ' successfully!');
       this.resetExamForm();
       this.renderExamsList();
@@ -398,6 +421,14 @@
       const name = exam ? exam.name : 'this exam';
       if (window.confirm('Delete ' + name + '?')) {
         window.ReboundStorage.deleteExam(id);
+        const allExams = window.ReboundStorage.getExams();
+        const currentSettings = window.ReboundStorage.getSettings();
+        if (allExams.length > 0) {
+          const newPlan = window.ReboundScheduler.generatePlan(allExams, currentSettings.dailyHours);
+          window.ReboundStorage.savePlan(newPlan);
+        } else {
+          window.ReboundStorage.savePlan(null);
+        }
         this.renderExamsList();
         this.render();
         this.showStatus('Deleted ' + name);
@@ -489,6 +520,7 @@
       try {
         const exams = window.ReboundStorage.getExams();
         const settings = window.ReboundStorage.getSettings();
+        let plan = window.ReboundStorage.getPlan();
 
         // 1. If no exams exist -> show Welcome view, hide other tabs
         if (exams.length === 0) {
@@ -498,21 +530,27 @@
           return;
         }
 
-        // 2. If exams exist -> hide Welcome view
+        // 2. Ensure plan exists
+        if (!plan || plan.length === 0) {
+          plan = window.ReboundScheduler.generatePlan(exams, settings.dailyHours);
+          window.ReboundStorage.savePlan(plan);
+        }
+
+        // 3. Hide Welcome view
         if (this.welcomeView) this.welcomeView.style.display = 'none';
 
-        // 3. Render active tab
+        // 4. Render active tab
         if (this.currentView === 'today') {
           if (this.todayView) {
             this.todayView.style.display = 'block';
-            this.renderTodayPlaceholder(exams, settings);
+            this.renderTodayView(plan, exams, settings);
           }
           if (this.planView) this.planView.style.display = 'none';
         } else {
           if (this.todayView) this.todayView.style.display = 'none';
           if (this.planView) {
             this.planView.style.display = 'block';
-            this.renderPlanPlaceholder(exams, settings);
+            this.renderFullPlan(plan, exams, settings);
           }
         }
       } catch (err) {
@@ -521,125 +559,364 @@
       }
     },
 
-    renderTodayPlaceholder: function(exams, settings) {
+    renderTodayView: function(plan, exams, settings) {
       if (!this.todayView) return;
       const self = this;
-      let examsSummaryHtml = '';
-      exams.forEach(function(exam) {
-        const days = getDaysFromToday(exam.date);
-        const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
-        const badgeClass = 'badge-' + getSubjectBadgeColor(exam);
-        examsSummaryHtml += `
-          <div class="exam-card-item">
-            <div class="exam-info">
-              <span class="subject-badge ${badgeClass}">${escapeHtml(exam.name)}</span>
-              <div class="exam-details">
-                <span class="exam-title">${escapeHtml(exam.name)} &bull; ${exam.chapters} chapters &bull; Difficulty ${exam.difficulty}/5</span>
-                <span class="exam-subtext">${exam.date} (${dayLabel})</span>
-              </div>
+
+      const todayStr = formatShortDate(getTodayString());
+      
+      // Calculate nearest upcoming exam
+      let nearestExam = null;
+      let minDays = Infinity;
+      exams.forEach(function(e) {
+        const d = getDaysFromToday(e.date);
+        if (d >= 0 && d < minDays) {
+          minDays = d;
+          nearestExam = e;
+        }
+      });
+
+      let nearestBadgeText = 'No upcoming exams';
+      if (nearestExam) {
+        if (minDays === 0) nearestBadgeText = `Today: ${nearestExam.name} Exam!`;
+        else if (minDays === 1) nearestBadgeText = `Tomorrow: ${nearestExam.name} Exam`;
+        else nearestBadgeText = `In ${minDays} days: ${nearestExam.name} Exam`;
+      }
+
+      // Check shortfall
+      const shortfallInfo = window.ReboundScheduler.detectShortfall(exams, settings.dailyHours);
+      let shortfallBannerHtml = '';
+      if (shortfallInfo && shortfallInfo.isShortfall) {
+        shortfallBannerHtml = `
+          <div class="validation-banner show" style="background: #FFFBEB; border-color: #FCD34D; color: #92400E; margin-bottom: 1.25rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <strong>Study Hours Shortfall (${shortfallInfo.hoursShort}h short)</strong>
+              <div style="font-size: 0.8125rem; margin-top: 0.25rem;">${escapeHtml(shortfallInfo.message)}</div>
             </div>
           </div>
         `;
-      });
+      }
+
+      // Today's day plan is Day 0 (dayOffset === 0)
+      const todayPlan = plan && plan.length > 0 ? plan[0] : null;
+      const tasks = todayPlan ? todayPlan.tasks.filter(t => !t.isExamDay && t.hours > 0) : [];
+      const completedCount = tasks.filter(t => t.completed).length;
+      const totalCount = tasks.length;
+      const allDone = totalCount > 0 && completedCount === totalCount;
+      const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+
+      let progressLabel = `${completedCount} of ${totalCount} tasks done`;
+      if (totalCount === 0) {
+        progressLabel = todayPlan && todayPlan.isExamDay ? 'Exam day • 0h study scheduled' : 'Rest day • 0 tasks';
+      }
+
+      let tasksHtml = '';
+      if (tasks.length === 0) {
+        if (todayPlan && todayPlan.isExamDay) {
+          tasksHtml = `
+            <div class="welcome-card" style="margin: 1.5rem 0; padding: 2rem; text-align: center;">
+              <div class="welcome-badge" style="background: #FEE2E2; color: #991B1B;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Exam Day
+              </div>
+              <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Good luck on your ${escapeHtml(todayPlan.examName)} Exam today!</h3>
+              <p style="font-size: 0.875rem; color: var(--color-text-muted);">
+                No study tasks scheduled for today. Focus on your exam and do your best!
+              </p>
+            </div>
+          `;
+        } else {
+          tasksHtml = `
+            <div class="welcome-card" style="margin: 1.5rem 0; padding: 2rem; text-align: center;">
+              <div class="welcome-badge" style="background: var(--color-success-light); color: var(--color-success);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Rest Day
+              </div>
+              <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">No study tasks scheduled for today</h3>
+              <p style="font-size: 0.875rem; color: var(--color-text-muted);">
+                You are completely on schedule! Take this time to rest and recharge before your next study session.
+              </p>
+            </div>
+          `;
+        }
+      } else {
+        tasks.forEach(function(task) {
+          const isDone = task.completed ? 'is-done' : '';
+          const checked = task.completed ? 'checked' : '';
+          const badgeClass = 'badge-' + getSubjectBadgeColor(task);
+
+          tasksHtml += `
+            <div class="today-task-card ${isDone}" data-task-id="${task.id}" id="card-${task.id}">
+              <div class="task-left-content">
+                <div class="task-checkbox-wrapper">
+                  <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" id="chk-${task.id}" ${checked} aria-label="Mark ${escapeHtml(task.subject)} ${escapeHtml(task.chapters)} complete">
+                </div>
+                <div class="task-desc">
+                  <span class="subject-badge ${badgeClass} task-subject-tag">${escapeHtml(task.subject)}</span>
+                  <span class="task-chapter-text">${escapeHtml(task.chapters)}</span>
+                </div>
+              </div>
+              <div class="task-right-meta">
+                <span>${task.hours} hrs</span>
+              </div>
+            </div>
+          `;
+        });
+      }
 
       this.todayView.innerHTML = `
-        <div class="welcome-card" style="margin: 1.5rem auto; text-align: left; max-width: 680px; padding: 2.5rem 2rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div class="welcome-badge" style="margin-bottom: 0;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Exams Saved (${exams.length})
+        <div class="today-container">
+          ${shortfallBannerHtml}
+
+          <!-- Header Card -->
+          <div class="today-header-card">
+            <div class="today-meta-row">
+              <span class="today-date-text">Today &bull; ${todayStr}</span>
+              <span class="nearest-exam-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ${nearestBadgeText}
+              </span>
             </div>
-            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-light); padding: 0.25rem 0.625rem; border-radius: var(--radius-full);">
-              Target: ${settings.dailyHours || 4.0} hrs/day
-            </span>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+              <div class="progress-header">
+                <span>Daily Progress</span>
+                <span id="today-progress-text">${progressLabel}</span>
+              </div>
+              <div class="progress-track" id="today-progress-track" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" id="today-progress-fill" style="width: ${percent}%;"></div>
+              </div>
+            </div>
           </div>
 
-          <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Your exams are saved!</h2>
-          <p style="font-size: 0.95rem; line-height: 1.5; color: var(--color-text-muted); margin-bottom: 1.25rem;">
-            Your daily study tasks will appear here once the study plan is generated. Here are your saved subjects:
-          </p>
-
-          <div class="exams-list" style="margin-bottom: 1.75rem;">
-            ${examsSummaryHtml}
+          <!-- All Done Celebration Banner (when all tasks completed) -->
+          <div class="all-done-banner" id="all-done-banner" style="display: ${allDone ? 'flex' : 'none'};">
+            <div class="all-done-icon" aria-hidden="true">🎉</div>
+            <div class="all-done-content">
+              <h4>All done for today!</h4>
+              <p>You've completed all scheduled study tasks. Great work! Take a well-earned break.</p>
+            </div>
           </div>
 
-          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-primary" id="btn-today-open-exams">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              Manage Exams &amp; Hours
+          <!-- Tasks List -->
+          <div class="today-tasks-container">
+            ${tasksHtml}
+          </div>
+
+          <!-- Missed Today Box -->
+          <div class="missed-today-box">
+            <div class="missed-today-text">
+              <h4>Fell behind or missed today?</h4>
+              <p>Rebound automatically redistributes unfinished hours across future study days.</p>
+            </div>
+            <button type="button" class="btn btn-amber" id="btn-missed-today">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              I missed today
             </button>
           </div>
         </div>
       `;
 
-      const btn = this.todayView.querySelector('#btn-today-open-exams');
-      if (btn) {
-        btn.addEventListener('click', function() {
-          self.openExamsModal();
+      // Attach task checkbox click and change listeners
+      this.todayView.querySelectorAll('.today-task-card').forEach(function(card) {
+        const checkbox = card.querySelector('.task-checkbox');
+        const taskId = card.getAttribute('data-task-id');
+
+        // Checkbox change event
+        if (checkbox) {
+          checkbox.addEventListener('change', function(e) {
+            e.stopPropagation();
+            self.handleTaskToggle(taskId, this.checked);
+          });
+        }
+
+        // Card body click event (outside the checkbox itself)
+        card.addEventListener('click', function(e) {
+          if (e.target === checkbox) return;
+          if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            self.handleTaskToggle(taskId, checkbox.checked);
+          }
+        });
+      });
+
+      // Hook up Missed Today button placeholder
+      const btnMissed = this.todayView.querySelector('#btn-missed-today');
+      if (btnMissed) {
+        btnMissed.addEventListener('click', function() {
+          alert("Missed Today preview is coming up next in Slice 5!");
         });
       }
     },
 
-    renderPlanPlaceholder: function(exams, settings) {
-      if (!this.planView) return;
-      const self = this;
-      
-      // Sort exams by date ascending
-      const sortedExams = exams.slice().sort(function(a, b) {
-        return getDaysFromToday(a.date) - getDaysFromToday(b.date);
+    handleTaskToggle: function(taskId, isChecked) {
+      const plan = window.ReboundStorage.getPlan();
+      if (!plan || plan.length === 0) return;
+
+      // Update in plan Day 0
+      let updated = false;
+      plan.forEach(function(day) {
+        day.tasks.forEach(function(task) {
+          if (task.id === taskId) {
+            task.completed = isChecked;
+            updated = true;
+          }
+        });
       });
 
-      let timelineHtml = '';
-      sortedExams.forEach(function(exam) {
-        const days = getDaysFromToday(exam.date);
-        const dayLabel = days === 0 ? 'Today' : (days === 1 ? 'Tomorrow' : 'In ' + days + ' days');
-        const badgeClass = 'badge-' + getSubjectBadgeColor(exam);
-        timelineHtml += `
-          <div class="exam-card-item">
-            <div class="exam-info">
-              <span class="subject-badge ${badgeClass}">${escapeHtml(exam.name)}</span>
-              <div class="exam-details">
-                <span class="exam-title">${escapeHtml(exam.name)} &bull; Exam Day: ${exam.date} (${dayLabel})</span>
-                <span class="exam-subtext">${exam.chapters} chapters &bull; Difficulty ${exam.difficulty}/5</span>
+      if (updated) {
+        window.ReboundStorage.savePlan(plan);
+
+        // Instant visual update for card
+        const card = this.todayView.querySelector(`.today-task-card[data-task-id="${taskId}"]`);
+        if (card) {
+          if (isChecked) card.classList.add('is-done');
+          else card.classList.remove('is-done');
+          const chk = card.querySelector('.task-checkbox');
+          if (chk) chk.checked = isChecked;
+        }
+
+        // Instant progress bar and all-done banner update
+        const todayPlan = plan[0];
+        const tasks = todayPlan ? todayPlan.tasks.filter(t => !t.isExamDay && t.hours > 0) : [];
+        const completedCount = tasks.filter(t => t.completed).length;
+        const totalCount = tasks.length;
+        const allDone = totalCount > 0 && completedCount === totalCount;
+        const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+
+        const progressText = document.getElementById('today-progress-text');
+        const progressFill = document.getElementById('today-progress-fill');
+        const progressTrack = document.getElementById('today-progress-track');
+        const allDoneBanner = document.getElementById('all-done-banner');
+
+        if (progressText) {
+          progressText.textContent = `${completedCount} of ${totalCount} tasks done`;
+        }
+        if (progressFill) {
+          progressFill.style.width = `${percent}%`;
+        }
+        if (progressTrack) {
+          progressTrack.setAttribute('aria-valuenow', percent);
+        }
+        if (allDoneBanner) {
+          allDoneBanner.style.display = allDone ? 'flex' : 'none';
+        }
+      }
+    },
+
+    renderFullPlan: function(plan, exams, settings) {
+      if (!this.planView) return;
+      const self = this;
+
+      // Check shortfall
+      const shortfallInfo = window.ReboundScheduler.detectShortfall(exams, settings.dailyHours);
+      let shortfallBannerHtml = '';
+      if (shortfallInfo && shortfallInfo.isShortfall) {
+        shortfallBannerHtml = `
+          <div class="validation-banner show" style="background: #FFFBEB; border-color: #FCD34D; color: #92400E; margin-bottom: 1.25rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <strong>Study Hours Shortfall (${shortfallInfo.hoursShort}h short)</strong>
+              <div style="font-size: 0.8125rem; margin-top: 0.25rem;">${escapeHtml(shortfallInfo.message)}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      let daysHtml = '';
+      let totalPlannedHours = 0;
+
+      plan.forEach(function(day) {
+        totalPlannedHours += day.totalHours;
+        const isExamDay = day.isExamDay ? 'is-exam-day' : '';
+        const hasRevision = day.tasks.some(t => t.isRevision) ? 'has-revision' : '';
+
+        let badgesHtml = '';
+        if (day.isExamDay) {
+          badgesHtml += `<span class="badge-exam-pill">EXAM DAY: ${escapeHtml(day.examName)}</span>`;
+        }
+        if (day.tasks.some(t => t.isRevision)) {
+          badgesHtml += `<span class="badge-revision-pill">Light Revision</span>`;
+        }
+
+        let tasksRowsHtml = '';
+        if (day.tasks.length === 0 || (day.isExamDay && day.tasks.every(t => t.hours === 0))) {
+          if (day.isExamDay) {
+            tasksRowsHtml = `
+              <div style="font-size: 0.875rem; color: var(--color-primary); font-weight: 600; padding: 0.5rem 0;">
+                Best of luck on your ${escapeHtml(day.examName)} Exam today! (0h study scheduled)
               </div>
+            `;
+          } else {
+            tasksRowsHtml = `<div style="font-size: 0.875rem; color: var(--color-text-muted); padding: 0.5rem 0;">Rest Day — No study scheduled</div>`;
+          }
+        } else {
+          day.tasks.forEach(function(t) {
+            if (t.isExamDay) return;
+            const badgeClass = 'badge-' + getSubjectBadgeColor(t);
+            const revisionBadge = t.isRevision ? '<span class="badge-revision-pill" style="font-size: 0.7rem; padding: 0.15rem 0.4rem; margin-left: 0.5rem;">Revision</span>' : '';
+            tasksRowsHtml += `
+              <div class="timeline-task-row">
+                <div class="timeline-task-info">
+                  <span class="subject-badge ${badgeClass}">${escapeHtml(t.subject)}</span>
+                  <span class="timeline-task-chapters">${escapeHtml(t.chapters)}${revisionBadge}</span>
+                </div>
+                <span class="timeline-task-hours">${t.hours} hrs</span>
+              </div>
+            `;
+          });
+        }
+
+        daysHtml += `
+          <div class="timeline-day-card ${isExamDay} ${hasRevision}">
+            <div class="timeline-day-header">
+              <span class="timeline-day-title">
+                Day ${day.dayIndex} &bull; ${day.dateString}
+              </span>
+              <div class="timeline-day-badges">
+                ${badgesHtml}
+                <span class="timeline-task-hours">${day.totalHours} hrs planned</span>
+              </div>
+            </div>
+            <div class="timeline-tasks-list">
+              ${tasksRowsHtml}
             </div>
           </div>
         `;
       });
 
       this.planView.innerHTML = `
-        <div class="welcome-card" style="margin: 1.5rem auto; text-align: left; max-width: 680px; padding: 2.5rem 2rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div class="welcome-badge" style="margin-bottom: 0;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Full Plan Overview
+        <div class="plan-container">
+          ${shortfallBannerHtml}
+
+          <!-- Overview Header -->
+          <div class="plan-header-box">
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">Full Study Plan Timeline</h2>
+              <p style="font-size: 0.875rem; color: var(--color-text-muted);">
+                ${plan.length} total days &bull; ${totalPlannedHours.toFixed(1)} planned study hours &bull; Target ${settings.dailyHours}h/day
+              </p>
             </div>
-            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-light); padding: 0.25rem 0.625rem; border-radius: var(--radius-full);">
-              ${settings.dailyHours || 4.0} hrs/day
-            </span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="btn btn-secondary" id="btn-replan-all">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Edit Exams &amp; Hours
+              </button>
+            </div>
           </div>
 
-          <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Study Plan Timeline</h2>
-          <p style="font-size: 0.95rem; line-height: 1.5; color: var(--color-text-muted); margin-bottom: 1.25rem;">
-            Your full day-by-day study schedule and light revision milestones will appear here. Upcoming exam deadlines:
-          </p>
-
-          <div class="exams-list" style="margin-bottom: 1.75rem;">
-            ${timelineHtml}
-          </div>
-
-          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-primary" id="btn-plan-open-exams">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              Manage Exams &amp; Hours
-            </button>
+          <!-- Timeline Days -->
+          <div class="plan-timeline">
+            ${daysHtml}
           </div>
         </div>
       `;
 
-      const btn = this.planView.querySelector('#btn-plan-open-exams');
-      if (btn) {
-        btn.addEventListener('click', function() {
+      const btnEdit = this.planView.querySelector('#btn-replan-all');
+      if (btnEdit) {
+        btnEdit.addEventListener('click', function() {
           self.openExamsModal();
         });
       }
@@ -678,7 +955,8 @@
     formatDateToISO: formatDateToISO,
     getTodayString: getTodayString,
     getDaysFromToday: getDaysFromToday,
-    addDaysToToday: addDaysToToday
+    addDaysToToday: addDaysToToday,
+    formatShortDate: formatShortDate
   };
 
   // Launch on DOM ready
