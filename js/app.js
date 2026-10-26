@@ -68,10 +68,14 @@
   // App State & DOM Elements
   const App = {
     currentView: 'today',
+    simulatedHours: null,
+    pendingDailyHours: null,
 
     init: function() {
       if (window.location.hash === '#plan') {
         this.currentView = 'plan';
+      } else if (window.location.hash === '#forecast') {
+        this.currentView = 'forecast';
       }
       this.cacheElements();
       this.bindEvents();
@@ -83,10 +87,12 @@
       this.welcomeView = document.getElementById('welcome-view');
       this.todayView = document.getElementById('today-view');
       this.planView = document.getElementById('plan-view');
+      this.forecastView = document.getElementById('forecast-view');
 
       // Navigation
       this.navToday = document.getElementById('nav-today');
       this.navPlan = document.getElementById('nav-plan');
+      this.navForecast = document.getElementById('nav-forecast');
       this.btnOpenExams = document.getElementById('btn-open-exams');
       this.btnWelcomeAdd = document.getElementById('btn-welcome-add');
 
@@ -125,6 +131,13 @@
       this.undoToast = document.getElementById('undo-toast');
       this.btnUndoReplan = document.getElementById('btn-undo-replan');
       this.btnDismissUndo = document.getElementById('btn-dismiss-undo');
+
+      // Confirm Hours Modal Elements
+      this.modalConfirmHours = document.getElementById('modal-confirm-hours');
+      this.confirmHoursBody = document.getElementById('confirm-hours-body');
+      this.btnConfirmHoursClose = document.getElementById('btn-confirm-hours-close');
+      this.btnConfirmHoursCancel = document.getElementById('btn-confirm-hours-cancel');
+      this.btnConfirmHoursApply = document.getElementById('btn-confirm-hours-apply');
     },
 
     bindEvents: function() {
@@ -210,6 +223,30 @@
         });
       }
 
+      // Confirm Hours Modal Buttons
+      if (this.btnConfirmHoursClose) {
+        this.btnConfirmHoursClose.addEventListener('click', function() {
+          self.closeConfirmHoursModal();
+        });
+      }
+      if (this.btnConfirmHoursCancel) {
+        this.btnConfirmHoursCancel.addEventListener('click', function() {
+          self.closeConfirmHoursModal();
+        });
+      }
+      if (this.modalConfirmHours) {
+        this.modalConfirmHours.addEventListener('click', function(e) {
+          if (e.target === self.modalConfirmHours) {
+            self.closeConfirmHoursModal();
+          }
+        });
+      }
+      if (this.btnConfirmHoursApply) {
+        this.btnConfirmHoursApply.addEventListener('click', function() {
+          self.applySimulatedHours();
+        });
+      }
+
       // Navigation tab switching
       const mainNav = document.getElementById('main-nav');
       if (mainNav) {
@@ -232,10 +269,15 @@
           self.switchView('plan');
         });
       }
+      if (this.navForecast) {
+        this.navForecast.addEventListener('click', function() {
+          self.switchView('forecast');
+        });
+      }
 
       window.addEventListener('hashchange', function() {
         const hash = window.location.hash.replace('#', '');
-        if (hash === 'plan' || hash === 'today') {
+        if (hash === 'plan' || hash === 'today' || hash === 'forecast') {
           self.switchView(hash);
         }
       });
@@ -590,19 +632,16 @@
         }
       } catch (e) {}
 
-      if (viewName === 'today') {
-        if (this.navToday) this.navToday.classList.add('active');
-        if (this.navPlan) this.navPlan.classList.remove('active');
-      } else {
-        if (this.navPlan) this.navPlan.classList.add('active');
-        if (this.navToday) this.navToday.classList.remove('active');
-      }
+      if (this.navToday) this.navToday.classList.toggle('active', viewName === 'today');
+      if (this.navPlan) this.navPlan.classList.toggle('active', viewName === 'plan');
+      if (this.navForecast) this.navForecast.classList.toggle('active', viewName === 'forecast');
+
       this.render();
     },
 
     render: function() {
       try {
-        if (!document.getElementById('today-view') || !document.getElementById('plan-view')) {
+        if (!document.getElementById('today-view') || !document.getElementById('plan-view') || !document.getElementById('forecast-view')) {
           const root = document.getElementById('app-root');
           if (root) {
             root.innerHTML = `
@@ -634,6 +673,7 @@
               </section>
               <section id="today-view" style="display: none;" aria-label="Today's Study Schedule"></section>
               <section id="plan-view" style="display: none;" aria-label="Full Exam Study Plan"></section>
+              <section id="forecast-view" style="display: none;" aria-label="Reality Check Forecast"></section>
             `;
             this.cacheElements();
             if (this.btnWelcomeAdd) {
@@ -654,6 +694,7 @@
           if (this.welcomeView) this.welcomeView.style.display = 'block';
           if (this.todayView) this.todayView.style.display = 'none';
           if (this.planView) this.planView.style.display = 'none';
+          if (this.forecastView) this.forecastView.style.display = 'none';
           return;
         }
 
@@ -673,8 +714,17 @@
             this.renderTodayView(plan, exams, settings);
           }
           if (this.planView) this.planView.style.display = 'none';
+          if (this.forecastView) this.forecastView.style.display = 'none';
+        } else if (this.currentView === 'forecast') {
+          if (this.todayView) this.todayView.style.display = 'none';
+          if (this.planView) this.planView.style.display = 'none';
+          if (this.forecastView) {
+            this.forecastView.style.display = 'block';
+            this.renderForecastView(plan, exams, settings);
+          }
         } else {
           if (this.todayView) this.todayView.style.display = 'none';
+          if (this.forecastView) this.forecastView.style.display = 'none';
           if (this.planView) {
             this.planView.style.display = 'block';
             this.renderFullPlan(plan, exams, settings);
@@ -1191,6 +1241,327 @@
       if (this.undoToast) this.undoToast.style.display = 'none';
       this.render();
       this.showStatus('Plan restored to previous schedule');
+    },
+
+    renderForecastView: function(plan, exams, settings) {
+      if (!this.forecastView) return;
+      const self = this;
+
+      if (!this.simulatedHours) {
+        this.simulatedHours = settings.dailyHours || 4.0;
+      }
+
+      // Initial simulation at current simulatedHours
+      const forecast = window.ReboundScheduler.simulateForecast(exams, plan, this.simulatedHours, settings.dailyHours);
+
+      // Edge Case 1: No exams
+      if (exams.length === 0) {
+        this.forecastView.innerHTML = `
+          <div class="welcome-card" style="max-width: 540px; margin: 2rem auto; text-align: center;">
+            <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">No exams to forecast yet</h2>
+            <p style="font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 1.5rem;">Add your upcoming exams and target hours to simulate study feasibility and minimum required hours.</p>
+            <button type="button" class="btn btn-primary" id="btn-forecast-add-exam">Add an exam</button>
+          </div>
+        `;
+        const addBtn = document.getElementById('btn-forecast-add-exam');
+        if (addBtn) {
+          addBtn.addEventListener('click', function() { self.openExamsModal(); });
+        }
+        return;
+      }
+
+      // Edge Case 2: All exams passed
+      if (forecast.allExamsPassed) {
+        this.forecastView.innerHTML = `
+          <div class="forecast-container">
+            <div class="forecast-header-box">
+              <h2 class="forecast-header-title">Reality Check Forecast</h2>
+              <p class="forecast-header-subtitle">All your scheduled exams have already passed. There are no upcoming exams left to forecast.</p>
+              <div class="forecast-disclaimer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                <span>This estimates how much of your planned study fits. It is not a prediction of your exam score.</span>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Render main Forecast template
+      let html = `
+        <div class="forecast-container">
+          <!-- Header Box -->
+          <div class="forecast-header-box">
+            <h2 class="forecast-header-title">Reality Check Forecast</h2>
+            <p class="forecast-header-subtitle">Explore what it would take to comfortably fit all your study work before exam day.</p>
+            <div class="forecast-disclaimer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              <span>This estimates how much of your planned study fits. It is not a prediction of your exam score.</span>
+            </div>
+          </div>
+
+          <!-- Encouraging Banner if all tasks already done -->
+          ${forecast.allTasksDone ? `
+            <div class="forecast-comparison-banner banner-success" style="font-size: 0.9375rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>🎉 Every study task in your plan is completed! You are 100% prepared.</span>
+            </div>
+          ` : ''}
+
+          <!-- Section 1: Where You Stand -->
+          <section class="forecast-section" aria-labelledby="heading-where-you-stand">
+            <h3 class="forecast-section-title" id="heading-where-you-stand">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Where you stand
+            </h3>
+            <div class="forecast-cards-grid" id="forecast-subject-cards">
+              <!-- Dynamically populated by updateForecastUI -->
+            </div>
+          </section>
+
+          <!-- Section 2: What If I Study... -->
+          <section class="forecast-section" aria-labelledby="heading-what-if">
+            <h3 class="forecast-section-title" id="heading-what-if">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              What if I study...
+            </h3>
+            <div class="forecast-simulator-card">
+              <div class="forecast-slider-row">
+                <div class="forecast-slider-header">
+                  <label for="forecast-hours-slider">Daily Study Commitment</label>
+                  <span class="forecast-slider-display"><span id="forecast-display-hours">${this.simulatedHours.toFixed(1)}</span> h / day</span>
+                </div>
+                <input type="range" class="forecast-slider-input" id="forecast-hours-slider" min="1.0" max="10.0" step="0.5" value="${this.simulatedHours}">
+                <div class="forecast-slider-ticks">
+                  <span>1.0h</span>
+                  <span>2.5h</span>
+                  <span>5.0h</span>
+                  <span>7.5h</span>
+                  <span>10.0h</span>
+                </div>
+              </div>
+
+              <!-- Comparison Note -->
+              <div id="forecast-comparison-note">
+                <!-- Dynamically populated -->
+              </div>
+
+              <!-- Action Button -->
+              <div>
+                <button type="button" class="btn btn-primary" id="btn-use-simulated-hours" style="width: 100%; min-height: 44px;">
+                  Use ${this.simulatedHours.toFixed(1)} hours/day
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3: The Minimum You Need -->
+          <section class="forecast-section" aria-labelledby="heading-minimum-need">
+            <h3 class="forecast-section-title" id="heading-minimum-need">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m17 19-5 3-5-3"/></svg>
+              The minimum you need
+            </h3>
+            <div class="forecast-minimum-card">
+              <p class="forecast-minimum-sentence" id="forecast-minimum-text">
+                <!-- Dynamically populated -->
+              </p>
+            </div>
+          </section>
+        </div>
+      `;
+
+      this.forecastView.innerHTML = html;
+
+      // Populate interactive elements
+      this.updateForecastUI(plan, exams, settings);
+
+      // Wire Slider Event (instant update without state change)
+      const slider = document.getElementById('forecast-hours-slider');
+      if (slider) {
+        slider.addEventListener('input', function() {
+          self.simulatedHours = parseFloat(this.value);
+          self.updateForecastUI(plan, exams, settings);
+        });
+      }
+
+      // Wire "Use X hours/day" Button
+      const btnUse = document.getElementById('btn-use-simulated-hours');
+      if (btnUse) {
+        btnUse.addEventListener('click', function() {
+          self.openConfirmHoursModal(self.simulatedHours, settings.dailyHours);
+        });
+      }
+    },
+
+    updateForecastUI: function(plan, exams, settings) {
+      const simulatedHours = this.simulatedHours || settings.dailyHours || 4.0;
+      const forecast = window.ReboundScheduler.simulateForecast(exams, plan, simulatedHours, settings.dailyHours);
+      const currentForecast = window.ReboundScheduler.simulateForecast(exams, plan, settings.dailyHours, settings.dailyHours);
+      const minHours = window.ReboundScheduler.findMinimumDailyHours(exams, plan);
+
+      // 1. Update display number
+      const displayHours = document.getElementById('forecast-display-hours');
+      if (displayHours) displayHours.textContent = simulatedHours.toFixed(1);
+
+      // 2. Update Subject Cards
+      const cardsGrid = document.getElementById('forecast-subject-cards');
+      if (cardsGrid) {
+        let cardsHtml = '';
+        forecast.subjects.forEach(function(s) {
+          const badgeClass = 'badge-' + getSubjectBadgeColor(s);
+          const daysText = s.daysLeft === 0 ? 'Exam Today' : (s.daysLeft === 1 ? 'Exam Tomorrow' : `${s.daysLeft} days left`);
+          
+          let statusIcon = '';
+          if (s.status === 'on-track') {
+            statusIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+          } else if (s.status === 'tight') {
+            statusIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
+          } else {
+            statusIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+          }
+
+          cardsHtml += `
+            <div class="forecast-card" data-subject-id="${s.id}">
+              <div class="forecast-card-top">
+                <span class="subject-badge ${badgeClass}">${escapeHtml(s.name)}</span>
+                <span class="forecast-days-left">${daysText}</span>
+              </div>
+              
+              <div class="forecast-card-metrics">
+                <span class="forecast-metric-needed">Needed: <strong>${s.neededHours}h</strong></span>
+                <span class="forecast-metric-sched">Scheduled: <strong>${s.scheduledHours}h</strong></span>
+              </div>
+
+              <div class="forecast-bar-wrapper">
+                <div class="forecast-bar-track">
+                  <div class="forecast-bar-fill bar-${s.status}" style="width: ${s.coveragePct}%;"></div>
+                </div>
+                <div class="forecast-bar-label-row">
+                  <span>Coverage</span>
+                  <span>${s.coveragePct}% (${s.scheduledHours}h of ${s.neededHours}h)</span>
+                </div>
+              </div>
+
+              <div class="forecast-status-badge status-${s.status}">
+                ${statusIcon}
+                <span>${s.statusLabel}</span>
+              </div>
+            </div>
+          `;
+        });
+        cardsGrid.innerHTML = cardsHtml;
+      }
+
+      // 3. Update Comparison Note
+      const compNote = document.getElementById('forecast-comparison-note');
+      if (compNote) {
+        const coveredSim = forecast.coveredCount;
+        const totalSubs = forecast.totalCount;
+        const currentCovered = currentForecast.coveredCount;
+
+        const subText = (coveredSim === totalSubs) ? `all ${totalSubs} subjects` : `${coveredSim} of ${totalSubs} subjects`;
+        const nowText = (currentCovered === totalSubs) ? `all ${totalSubs}` : `${currentCovered} of ${totalSubs}`;
+
+        if (forecast.everythingFits) {
+          compNote.className = 'forecast-comparison-banner banner-success';
+          compNote.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>At ${simulatedHours.toFixed(1)}h/day: ${subText} covered (now: ${nowText}) &bull; Everything fits!</span>
+          `;
+        } else {
+          const isHeavyDeficit = forecast.totalShortfall > 5;
+          compNote.className = isHeavyDeficit ? 'forecast-comparison-banner banner-deficit' : 'forecast-comparison-banner banner-warning';
+          compNote.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>At ${simulatedHours.toFixed(1)}h/day: ${subText} covered (now: ${nowText}) &bull; Short by ${forecast.totalShortfall}h total</span>
+          `;
+        }
+      }
+
+      // 4. Update Button State
+      const btnUse = document.getElementById('btn-use-simulated-hours');
+      if (btnUse) {
+        btnUse.textContent = `Use ${simulatedHours.toFixed(1)} hours/day`;
+        btnUse.disabled = (simulatedHours === settings.dailyHours);
+      }
+
+      // 5. Update Minimum Sentence
+      const minText = document.getElementById('forecast-minimum-text');
+      if (minText) {
+        if (minHours !== null) {
+          minText.innerHTML = `To cover everything you need about <strong>${minHours.toFixed(1)} hours a day</strong>.`;
+        } else {
+          // Fallback if even 12h is insufficient
+          const sortedByDiff = exams.slice().sort(function(a, b) { return a.difficulty - b.difficulty; });
+          const trimmedSubject = sortedByDiff[0] ? sortedByDiff[0].name : 'lower-priority material';
+          minText.innerHTML = `Even at 12 hours a day, the time remaining before your exams is too tight to cover 100% of the material. At your current setting (${settings.dailyHours}h/day), <strong>${escapeHtml(trimmedSubject)}</strong> is trimmed first to focus on core high-yield summaries.`;
+        }
+      }
+    },
+
+    openConfirmHoursModal: function(newHours, currentHours) {
+      if (!this.modalConfirmHours || !this.confirmHoursBody) return;
+      this.pendingDailyHours = newHours;
+
+      this.confirmHoursBody.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <p style="font-size: 0.9375rem; color: var(--color-text); line-height: 1.5; margin: 0;">
+            Update your daily study target from <strong>${currentHours.toFixed(1)}h/day</strong> to <strong>${newHours.toFixed(1)}h/day</strong>?
+          </p>
+          <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.875rem 1rem; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.4;">
+            <p style="margin: 0;"><strong>What happens next:</strong></p>
+            <ul style="margin: 0.375rem 0 0 1.25rem; padding: 0;">
+              <li>Your daily schedule will be recalculated with ${newHours.toFixed(1)}h/day.</li>
+              <li>All completed tasks remain securely checked.</li>
+              <li>No work is deleted or placed on exam days.</li>
+            </ul>
+          </div>
+        </div>
+      `;
+
+      this.modalConfirmHours.classList.add('open');
+    },
+
+    closeConfirmHoursModal: function() {
+      if (this.modalConfirmHours) {
+        this.modalConfirmHours.classList.remove('open');
+      }
+      this.pendingDailyHours = null;
+    },
+
+    applySimulatedHours: function() {
+      if (!this.pendingDailyHours) return;
+      const newHours = this.pendingDailyHours;
+      this.closeConfirmHoursModal();
+
+      // Save new settings
+      window.ReboundStorage.saveSettings({ dailyHours: newHours });
+
+      // Regenerate plan while preserving completed tasks
+      const allExams = window.ReboundStorage.getExams();
+      const currentPlan = window.ReboundStorage.getPlan();
+      
+      const updatedPlan = window.ReboundScheduler.generatePlan(allExams, newHours);
+      
+      // Transfer completed task marks
+      if (currentPlan && Array.isArray(currentPlan)) {
+        currentPlan.forEach(function(oldDay) {
+          const newDay = updatedPlan.find(function(d) { return d.dayIndex === oldDay.dayIndex; });
+          if (newDay && oldDay.tasks) {
+            oldDay.tasks.forEach(function(oldTask) {
+              if (oldTask.completed) {
+                const newTask = newDay.tasks.find(function(t) { return t.examId === oldTask.examId; });
+                if (newTask) newTask.completed = true;
+              }
+            });
+          }
+        });
+      }
+
+      window.ReboundStorage.savePlan(updatedPlan);
+      this.simulatedHours = newHours;
+      this.render();
+      this.showStatus(`Updated daily hours to ${newHours.toFixed(1)} hrs/day`);
     },
 
     renderErrorMessage: function(msg) {

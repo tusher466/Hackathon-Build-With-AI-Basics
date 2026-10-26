@@ -24,6 +24,7 @@
       <nav class="nav-pills" id="main-nav" aria-label="Main Navigation">
         <button type="button" class="nav-pill active" id="nav-today" data-view="today">Today</button>
         <button type="button" class="nav-pill" id="nav-plan" data-view="plan">Full Plan</button>
+        <button type="button" class="nav-pill" id="nav-forecast" data-view="forecast">Forecast</button>
       </nav>
 
       <!-- Header Actions -->
@@ -76,6 +77,9 @@
 
     <!-- Full Plan View Container (Hidden until exams exist) -->
     <section id="plan-view" style="display: none;" aria-label="Full Exam Study Plan"></section>
+
+    <!-- Forecast View Container (Hidden until active) -->
+    <section id="forecast-view" style="display: none;" aria-label="Reality Check Forecast"></section>
 
   </main>
 
@@ -201,6 +205,32 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-missed-cancel">Cancel</button>
           <button type="button" class="btn btn-amber" id="btn-missed-apply">Apply Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Hours Modal -->
+    <div class="modal-backdrop" id="modal-confirm-hours" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-hours-title">
+      <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--color-primary-light); color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: 0.875rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+            </div>
+            <h2 id="modal-confirm-hours-title" style="font-size: 1.125rem;">Apply Daily Study Hours</h2>
+          </div>
+          <button type="button" class="btn-icon" id="btn-confirm-hours-close" aria-label="Close dialog">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="modal-body" id="confirm-hours-body">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-confirm-hours-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-confirm-hours-apply">Apply &amp; Regenerate Plan</button>
         </div>
       </div>
     </div>

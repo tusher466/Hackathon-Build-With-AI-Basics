@@ -69,6 +69,16 @@ Build mode: learn
   Learner check: Edit daily study hours from 4h to 2h to view the calm shortfall message. Shrink your browser window to mobile width and walk through the entire 2-minute demo flow.
   Commit: `Add shortfall reality check alert and mobile responsive styling`
 
+- [x] **7. Reality Check Forecast (What-If Simulator)**
+  Becomes usable: A third tab "Forecast" allows students to simulate study workloads with an interactive hours slider (1 to 10h/day). Cards show per-subject coverage bars, needed vs. scheduled hours, and non-amber status badges (On track / Tight / Behind). The app calculates the exact minimum hours needed to cover all work, provides instant comparisons, and allows applying the simulated hours without ever mutating saved state during simulation.
+  Why now: Extra hackathon feature strengthening Rebound's value proposition: lets students explore "what would it take?" before committing, reducing anxiety with clarity.
+  PRD ref: `prd.md > Screens and Layout (7. Forecast View)`, `prd.md > Features and Behavior (6. Reality Check Forecast)`
+  Spec ref: `spec.md > Components (8. Reality Check Forecast View)`, `spec.md > Scheduling Rules (6. Forecast Simulation Rules)`, `spec.md > Forecast What-If Simulation: Worked Example`
+  Build: Implement pure function `scheduler.simulateForecast()`, `scheduler.findMinimumDailyHours()`, add Forecast tab and container in `index.html`, render forecast view in `js/app.js` with dynamic slider input, coverage bars, non-amber status badges, and "Use X hours/day" confirmation modal.
+  Verify (mechanical): Run automated test asserting that at 4h/day all 3 subjects show 100% coverage with 0h shortfall, at 2h/day shortfall is 10h, and minimum needed hours is 3.5h for clean start and 3.0h after Day 1.
+  Learner check: Open Forecast tab. Confirm cards show 100% On track at 4h/day. Drag slider to 2h/day and verify live update to Tight/Behind and 10h short without saving to localStorage. Verify "The minimum you need" sentence says 3.5 hours/day. Click "Use 5.0 hours/day", click Cancel, click again and Apply, and verify plan updates with existing ticked tasks preserved.
+  Commit: `Implement Reality Check Forecast what-if simulator and minimum hours calculator`
+
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — Slice 2 (Exams entered and persisted in localStorage)

@@ -138,6 +138,14 @@ PRD ref: `prd.md > Screens and Layout`, `prd.md > Features and Behavior`
 - Renders calm informative card if required hours > available capacity.
 - Explains hours deficit and lists which low-priority chapters were trimmed.
 
+### 8. Reality Check Forecast View (`app.js`, `scheduler.js`)
+- Implements `prd.md > Screens and Layout (7. Forecast View)`.
+- Renders dedicated "Forecast" tab via `app.renderForecastView()`.
+- Interactive slider (1.0 to 10.0h/day in 0.5h steps). Moving the slider calls `scheduler.simulateForecast()` and updates coverage bars and status pills in real time.
+- Isolation: Simulation runs purely in-memory. Zero writes to `localStorage` or active plan state during slider movement.
+- "The minimum you need" card calls `scheduler.findMinimumDailyHours()`.
+- "Use X hours/day" button triggers confirmation before applying new setting to `storage.saveSettings()` and regenerating the plan while preserving all completed task ticks.
+
 ---
 
 ## Data Model
@@ -259,6 +267,24 @@ When *"I missed today"* is triggered on Day $d$:
   - Trimmed chapters are converted to high-level review blocks.
   - Renders calm message: *"You have X hours of study needed but only Y hours available at Z h/day (short by Δ hours). We prioritized your upcoming Calculus and Physics exams and trimmed Economics Ch. 4–5 to core summaries."*
 
+### 6. Forecast Simulation Rules & Minimum Hours Formula
+The what-if simulator is a pure function `simulateForecast(exams, currentPlan, simulatedDailyHours, currentDailyHours)`:
+- **Remaining Needed Hours ($H_{\text{needed}}$):** For each subject with an upcoming exam, compute total curriculum hours minus hours of already ticked (`completed: true`) tasks. If all tasks for that subject are done, $H_{\text{needed}} = 0$.
+- **Simulated Scheduled Hours ($H_{\text{sched}}$):** Run the pure planning allocation with `simulatedDailyHours` over remaining days up to each exam's cutoff (exam day has 0h, day before capped at 1.0h light revision, daily cap = `simulatedDailyHours`).
+- **Subject Coverage:** $\text{Coverage} = \min(100\%, \text{round}((H_{\text{sched}} / H_{\text{needed}}) \times 100\%))$. If $H_{\text{needed}} == 0$, Coverage is $100\%$.
+- **Status Classification:**
+  - $100\%$: **"On track"** (Icon: checkmark, style: emerald/forest green badge)
+  - $80\%$ to $99\%$: **"Tight"** (Icon: circle/dash, style: slate/blue badge)
+  - $< 80\%$: **"Behind"** (Icon: alert triangle, style: rose/coral badge)
+  *(Strict constraint: Never use amber for status badges; amber is reserved exclusively for changed/added time).*
+- **Comparison Metric:** Compare count of fully covered subjects at `simulatedDailyHours` vs. current saved setting: e.g. *"At 5h/day: all 3 subjects covered (now: 1 of 3)"*.
+- **Minimum Hours Calculation (`findMinimumDailyHours(exams, currentPlan)`):**
+  - Scans half-hour steps from $0.5$ up to $12.0$.
+  - Runs simulation; finds smallest step where all active subjects reach $100\%$ coverage.
+  - If achievable: returns the float (e.g. `3.5`).
+  - If not achievable even at 12.0h: returns `null`, displaying a calm note explaining which subject is trimmed first based on existing shortfall priority.
+- **State Separation Guarantee:** Zero side-effects; never touches `localStorage` or mutating app variables during slider changes.
+
 ---
 
 ## Worked Example: Day-by-Day Walkthrough
@@ -324,6 +350,54 @@ When user edits daily limit to **2.0 hours/day**:
 
 ---
 
+### Forecast What-If Simulation: Worked Example (Demo Scenario)
+
+Using the demo setup:
+- **Calculus:** Exam in 6 days (Day 6), 8 ch, difficulty 4 $\rightarrow$ 12.0h total
+- **Physics:** Exam in 8 days (Day 8), 6 ch, difficulty 5 $\rightarrow$ 12.0h total
+- **Economics:** Exam in 10 days (Day 10), 5 ch, difficulty 2 $\rightarrow$ 5.0h total
+- Total needed at start: **29.0 hours**
+
+#### Table 1: Clean Start (Day 1, 0 tasks ticked)
+Current saved setting: **4.0h/day**.
+Active study days available before cutoffs: Calculus 5 days, Physics 7 days, Economics 9 days.
+
+| Daily Hours ($h/\text{day}$) | Calculus (Needed: 12.0h) | Physics (Needed: 12.0h) | Economics (Needed: 5.0h) | Total Sched / Shortfall | Comparison & Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **2.0 h/day** | 10.0h (83%) — **Tight** | 5.0h (42%) — **Behind** | 4.0h (80%) — **Tight** | 19.0h / **10.0h short** | At 2h/day: 0 of 3 covered (now: 3 of 3) |
+| **3.0 h/day** | 12.0h (100%) — **On track** | 10.0h (83%) — **Tight** | 5.0h (100%) — **On track** | 27.0h / **2.0h short** | At 3h/day: 2 of 3 covered (now: 3 of 3) |
+| **4.0 h/day** | 12.0h (100%) — **On track** | 12.0h (100%) — **On track** | 5.0h (100%) — **On track** | 29.0h / **0.0h short** | At 4h/day: all 3 subjects covered (now: 3 of 3) |
+| **5.0 h/day** | 12.0h (100%) — **On track** | 12.0h (100%) — **On track** | 5.0h (100%) — **On track** | 29.0h / **0.0h short** | At 5h/day: all 3 subjects covered (now: 3 of 3) |
+| **6.0 h/day** | 12.0h (100%) — **On track** | 12.0h (100%) — **On track** | 5.0h (100%) — **On track** | 29.0h / **0.0h short** | At 6h/day: all 3 subjects covered (now: 3 of 3) |
+
+**Minimum You Need (Clean Start):**
+- Exact threshold: **3.5 hours / day** (Calculus: 12.0h [100%], Physics: 12.0h [100%], Economics: 5.0h [100%]; total scheduled = 29.0h).
+- Sentence displayed: *"To cover everything you need about 3.5 hours a day."*
+- *Clean Fit Confirmation:* At **4.0h/day**, the demo scenario fits **cleanly with 100% on track across all subjects and 0h shortfall**. At **2.0h/day**, it exhibits a **10.0h shortfall** with Physics falling behind (42%) and Calculus/Economics tight (83%/80%).
+
+---
+
+#### Table 2: After Day 1 (Day 1: Calc 2.5h ticked, Phys 1.0h ticked, Econ 0h unticked)
+Remaining needed workload:
+- **Calculus:** $12.0\text{h} - 2.5\text{h} = \mathbf{9.5\text{h}}$ remaining (4 study days left)
+- **Physics:** $12.0\text{h} - 1.0\text{h} = \mathbf{11.0\text{h}}$ remaining (6 study days left)
+- **Economics:** $5.0\text{h} - 0.0\text{h} = \mathbf{5.0\text{h}}$ remaining (8 study days left)
+- Total remaining needed: **25.5 hours**
+
+| Daily Hours ($h/\text{day}$) | Calculus (Needed: 9.5h) | Physics (Needed: 11.0h) | Economics (Needed: 5.0h) | Total Sched / Shortfall | Comparison & Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **2.0 h/day** | 8.0h (84%) — **Tight** | 6.0h (55%) — **Behind** | 3.0h (60%) — **Behind** | 17.0h / **8.5h short** | At 2h/day: 0 of 3 covered (now: 3 of 3) |
+| **3.0 h/day** | 9.5h (100%) — **On track** | 11.0h (100%) — **On track** | 5.0h (100%) — **On track** | 25.5h / **0.0h short** | At 3h/day: all 3 subjects covered (now: 3 of 3) |
+| **4.0 h/day** | 9.5h (100%) — **On track** | 11.0h (100%) — **On track** | 5.0h (100%) — **On track** | 25.5h / **0.0h short** | At 4h/day: all 3 subjects covered (now: 3 of 3) |
+| **5.0 h/day** | 9.5h (100%) — **On track** | 11.0h (100%) — **On track** | 5.0h (100%) — **On track** | 25.5h / **0.0h short** | At 5h/day: all 3 subjects covered (now: 3 of 3) |
+| **6.0 h/day** | 9.5h (100%) — **On track** | 11.0h (100%) — **On track** | 5.0h (100%) — **On track** | 25.5h / **0.0h short** | At 6h/day: all 3 subjects covered (now: 3 of 3) |
+
+**Minimum You Need (After Day 1):**
+- Exact threshold: **3.0 hours / day** (Calculus: 9.5h [100%], Physics: 11.0h [100%], Economics: 5.0h [100%]; total scheduled = 25.5h).
+- Sentence displayed: *"To cover everything you need about 3.0 hours a day."*
+
+---
+
 ## File Structure
 
 ```
@@ -354,6 +428,7 @@ e:\my-hackathon-app\
 6. **Apply & Undo:** Click *"Apply"*. Verify changed days highlight in full plan. Click *"Undo"*; verify plan restores immediately.
 7. **Shortfall Check:** Lower hours to 2.0h. Verify calm shortfall alert appears explaining 9-hour deficit without application error.
 8. **Mobile Viewport:** Resize browser to 375px width. Verify no horizontal overflow, buttons remain easy to tap (min 44px), and cards stack cleanly.
+9. **Forecast What-If Check:** Switch to Forecast tab. Test slider from 2 to 6h, verify dynamic coverage recalculation, test "minimum you need", and verify "Use X hours/day" modal.
 
 ---
 
@@ -379,3 +454,7 @@ Every slice produces an immediately runnable, verifiable deliverable:
 6. **Slice 6: Reality Check (Shortfall) & Polish (`app.js`, `styles.css`)**
    - Implement shortfall alert on hour reductions, mobile responsive adjustments, and final visual polish.
    - *How to verify:* Lower daily hours to 2h and observe calm shortfall banner. Shrink window to phone width and run the complete 2-minute demo sequence.
+7. **Slice 7: Reality Check Forecast (What-If Simulator) (`js/scheduler.js`, `js/app.js`, `styles.css`)**
+   - Pure forecast simulation function, 3-tab navigation with mobile-friendly Forecast tab, subject coverage cards with progress bars and non-amber status badges (On track / Tight / Behind), 1–10h interactive slider with instant updates, comparison note, and "Use X hours/day" confirmation modal.
+   - *How to verify:* Open Forecast tab with the demo exams. Verify clean start numbers match the spec table (3.5h minimum, 4h fits cleanly with 100% On track, 2h shows 10h shortfall). Drag slider from 2 to 6; observe instantaneous updates without plan alteration. Tick 2 tasks on Day 1, reopen Forecast, verify remaining needed drops to 25.5h and minimum needed becomes 3.0h. Click "Use 5h/day", confirm dialog, verify plan updates while ticked tasks stay intact.
+

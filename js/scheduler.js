@@ -403,12 +403,189 @@
     };
   }
 
+  // Pure Forecast Simulator
+  function simulateForecast(exams, currentPlan, simulatedDailyHours, currentDailyHours) {
+    if (!exams || exams.length === 0) {
+      return {
+        simulatedDailyHours: parseFloat(simulatedDailyHours) || 4.0,
+        currentDailyHours: parseFloat(currentDailyHours) || 4.0,
+        subjects: [],
+        totalNeeded: 0,
+        totalScheduled: 0,
+        totalShortfall: 0,
+        everythingFits: true,
+        coveredCount: 0,
+        totalCount: 0,
+        noExams: true
+      };
+    }
+
+    simulatedDailyHours = parseFloat(simulatedDailyHours) || 4.0;
+    currentDailyHours = parseFloat(currentDailyHours) || 4.0;
+
+    const subjectsMap = {};
+    let allExamsPassed = true;
+    let allTasksDone = true;
+
+    exams.forEach(function(e) {
+      const daysLeft = getDaysFromToday(e.date);
+      const isPassed = daysLeft < 0;
+      if (!isPassed) allExamsPassed = false;
+      const hpc = HOURS_PER_CHAPTER[e.difficulty] || 1.0;
+      const totalRequired = roundToHalfHour(e.chapters * hpc);
+      subjectsMap[e.id] = {
+        id: e.id,
+        name: e.name,
+        color: e.color || 'indigo',
+        difficulty: e.difficulty,
+        daysLeft: daysLeft,
+        totalRequired: totalRequired,
+        completedHours: 0,
+        neededHours: totalRequired,
+        isExamPassed: isPassed
+      };
+    });
+
+    // Deduct completed tasks from current plan
+    if (currentPlan && Array.isArray(currentPlan)) {
+      currentPlan.forEach(function(day) {
+        if (!day.tasks) return;
+        day.tasks.forEach(function(task) {
+          if (task.completed && task.examId && subjectsMap[task.examId]) {
+            subjectsMap[task.examId].completedHours = roundToHalfHour(
+              subjectsMap[task.examId].completedHours + (task.hours || 0)
+            );
+          }
+        });
+      });
+    }
+
+    Object.keys(subjectsMap).forEach(function(id) {
+      const s = subjectsMap[id];
+      s.neededHours = Math.max(0, roundToHalfHour(s.totalRequired - s.completedHours));
+      if (s.neededHours > 0 && !s.isExamPassed) {
+        allTasksDone = false;
+      }
+    });
+
+    // Active exams to simulate remaining workload
+    const activeExams = [];
+    exams.forEach(function(e) {
+      const s = subjectsMap[e.id];
+      if (s.isExamPassed || s.neededHours <= 0) return;
+      const hpc = HOURS_PER_CHAPTER[e.difficulty] || 1.0;
+      const effectiveChapters = Math.max(0.5, s.neededHours / hpc);
+      activeExams.push({
+        id: e.id,
+        name: e.name,
+        date: e.date,
+        color: e.color,
+        difficulty: e.difficulty,
+        chapters: effectiveChapters
+      });
+    });
+
+    // Run pure planner allocation with simulated hours
+    let simPlan = [];
+    if (activeExams.length > 0) {
+      simPlan = generatePlan(activeExams, simulatedDailyHours);
+    }
+
+    const scheduledMap = {};
+    simPlan.forEach(function(d) {
+      if (!d.tasks) return;
+      d.tasks.forEach(function(t) {
+        if (!t.isExamDay && t.examId) {
+          scheduledMap[t.examId] = roundToHalfHour((scheduledMap[t.examId] || 0) + t.hours);
+        }
+      });
+    });
+
+    let totalNeeded = 0;
+    let totalScheduled = 0;
+    const subjectForecasts = [];
+
+    exams.forEach(function(e) {
+      const s = subjectsMap[e.id];
+      if (s.isExamPassed) return;
+
+      const needed = s.neededHours;
+      totalNeeded += needed;
+
+      let scheduled = 0;
+      if (needed === 0) {
+        scheduled = 0;
+      } else {
+        scheduled = Math.min(needed, scheduledMap[e.id] || 0);
+      }
+      totalScheduled += scheduled;
+
+      let coveragePct = 100;
+      if (needed > 0) {
+        coveragePct = Math.min(100, Math.round((scheduled / needed) * 100));
+      }
+
+      let status = 'on-track';
+      let statusLabel = 'On track';
+      if (coveragePct < 80) {
+        status = 'behind';
+        statusLabel = 'Behind';
+      } else if (coveragePct < 100) {
+        status = 'tight';
+        statusLabel = 'Tight';
+      }
+
+      subjectForecasts.push({
+        id: e.id,
+        name: e.name,
+        color: s.color,
+        daysLeft: s.daysLeft,
+        neededHours: needed,
+        scheduledHours: scheduled,
+        coveragePct: coveragePct,
+        status: status,
+        statusLabel: statusLabel
+      });
+    });
+
+    const totalShortfall = Math.max(0, roundToHalfHour(totalNeeded - totalScheduled));
+    const coveredSim = subjectForecasts.filter(function(s) { return s.coveragePct === 100; }).length;
+    const totalSubs = subjectForecasts.length;
+
+    return {
+      simulatedDailyHours: simulatedDailyHours,
+      currentDailyHours: currentDailyHours,
+      subjects: subjectForecasts,
+      totalNeeded: totalNeeded,
+      totalScheduled: totalScheduled,
+      totalShortfall: totalShortfall,
+      everythingFits: totalShortfall === 0 && subjectForecasts.every(function(s) { return s.coveragePct === 100; }),
+      coveredCount: coveredSim,
+      totalCount: totalSubs,
+      allExamsPassed: allExamsPassed,
+      allTasksDone: allTasksDone
+    };
+  }
+
+  // Fast minimum scanner
+  function findMinimumDailyHours(exams, currentPlan) {
+    if (!exams || exams.length === 0) return null;
+    for (let h = 0.5; h <= 12.0; h += 0.5) {
+      const res = simulateForecast(exams, currentPlan, h, 4.0);
+      if (res.everythingFits) return h;
+    }
+    return null;
+  }
+
   window.ReboundScheduler = {
     HOURS_PER_CHAPTER: HOURS_PER_CHAPTER,
     roundToHalfHour: roundToHalfHour,
     detectShortfall: detectShortfall,
     generatePlan: generatePlan,
-    previewMissedDay: previewMissedDay
+    previewMissedDay: previewMissedDay,
+    simulateForecast: simulateForecast,
+    findMinimumDailyHours: findMinimumDailyHours
   };
 
 })(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this));
+

@@ -8,6 +8,8 @@ status: approved
 > *"A study plan that bounces back when you miss a day."*
 > 
 > Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`
+> 
+> **Change log:** Feature *"Reality Check Forecast"* added after Slice 6 to provide proactive what-if simulation, letting students explore "what would it take?" before committing hours.
 
 Rebound is an intelligent, stress-reducing study planner for university students managing overlapping exam periods. It balances study workloads based on exam urgency and subject difficulty, and features a gentle, transparent re-planning preview that recalculates and visualizes shifts whenever a day of study is missed.
 
@@ -25,12 +27,13 @@ Source: `scope.md > The Core Loop`, `scope.md > What "Working" Looks Like`
 6. **Preview & Confirm:** The app displays a non-destructive preview modal with a headline (e.g., *"Moved 3h of unfinished work across the next 4 days"*), before-and-after hours per changed day, and amber indicators for added time. The student taps *"Apply"*.
 7. **Schedule Update & Undo:** The full plan view briefly highlights the updated days. Ticked tasks remain completed; nothing is deleted. An *"Undo"* option is readily available.
 8. **Reality Check (Shortfall):** If total required work exceeds the available study hours before exam dates, a calm alert explains the exact hours deficit and which lower-priority study sessions were trimmed first.
+9. **Forecast & What-If Exploration:** The student opens the *"Forecast"* tab to explore how different study habits (1 to 10h/day) would impact subject coverage without risking their saved plan, discovering the exact minimum hours needed to cover 100% of their work.
 
 ---
 
 ## Screens and Layout
 
-The application consists of a single responsive web interface with a top segmented navigation bar switching between **Today** and **Full Plan**, with a settings/exam manager access point:
+The application consists of a single responsive web interface with a top segmented navigation bar switching between **Today**, **Full Plan**, and **Forecast**, with a settings/exam manager access point:
 
 1. **Welcome View (First-Run Only):**
    - Clean, friendly greeting introducing Rebound.
@@ -61,6 +64,12 @@ The application consists of a single responsive web interface with a top segment
 6. **Reality Check Alert (Shortfall State):**
    - Triggered when total study hours required exceed capacity.
    - Displays a supportive, calm banner/card: *"You're short by X hours based on your daily limit. Here is what was trimmed to protect your rest and highest-priority exams."* Lists trimmed low-weight chapters.
+7. **Forecast View (Reality Check Simulator):**
+   - **Where you stand:** Card per active subject showing subject color tag, days left, hours still needed (excluding completed ticks), scheduled hours, visual coverage bar (capped at 100%), and status label with icon + text: *"On track"* (100%), *"Tight"* (80–99%), or *"Behind"* (<80%). Status labels use distinct non-clashing slate/teal/rose hues without using reserved amber.
+   - **What if I study...:** Interactive slider from 1.0 to 10.0 hours/day (0.5h steps), initialized to current setting. Moving the slider dynamically recalculates coverage and shortfalls instantly without mutating saved data. Shows comparison summary: *"At Xh/day: all Y subjects covered (now: Z of Y)"*.
+   - **The minimum you need:** Direct calculation of the smallest daily hours (0.5 to 12.0h) where every subject reaches 100% coverage, shown as a clear reassuring sentence: *"To cover everything you need about X hours a day."*
+   - **Action:** *"Use X hours/day"* button (disabled if slider matches current setting) that prompts confirmation and updates the plan while preserving all completed tasks.
+   - **Advisory note:** *"This estimates how much of your planned study fits. It is not a prediction of your exam score."*
 
 ---
 
@@ -127,12 +136,28 @@ The application consists of a single responsive web interface with a top segment
 - **Acceptance Criteria:**
   - [ ] Full page reload preserves all entered exams, checked tasks, and current schedule state.
 
+### 6. Reality Check Forecast (What-If Simulator)
+- **Behavior:**
+  - Dedicated "Forecast" tab lets students simulate study hours (1.0 to 10.0h/day in 0.5h steps) to evaluate workload coverage without altering saved data.
+  - "Where you stand" cards display days left, hours still needed (excluding completed ticks), scheduled hours, visual coverage bar %, and status labels ("On track" [100%], "Tight" [80–99%], "Behind" [<80%]). Status uses non-amber, accessible icons and text.
+  - "What if I study..." slider updates coverage, shortfalls, and comparison text instantly without lag.
+  - "The minimum you need" calculates the lowest half-hour step (0.5 to 12.0h) achieving 100% coverage across all active subjects.
+  - "Use X hours/day" button prompts confirmation and updates the plan safely, preserving all completed task ticks.
+  - Prominent advisory note: *"This estimates how much of your planned study fits. It is not a prediction of your exam score."*
+- **Acceptance Criteria:**
+  - [ ] Moving slider instantly updates subject coverage percentages and status labels without mutating `localStorage`.
+  - [ ] Slider displays the exact minimum daily hours needed (e.g. 3.5h/day for demo scenario).
+  - [ ] Clicking "Use X hours/day" and confirming updates the saved hours setting and regenerates the schedule while preserving all checked tasks.
+  - [ ] Clicking Cancel in confirmation leaves the plan and saved settings completely unchanged.
+  - [ ] "Use X hours/day" button is disabled when slider equals current setting.
+
 ---
 
 ## States and Boundaries
 
 - **Empty / First-Run State:** No exams exist in storage. Renders Welcome screen with *"Add my first exam"* button.
 - **Active Plan State:** Exams exist, schedule generated, Today view shows active tasks.
+- **Forecast State:** Interactive simulation view with slider and live coverage cards.
 - **Preview State:** Modal active during re-plan calculation showing proposed changes.
 - **Shortfall State:** Available hours < required workload. Shows calm capacity alert.
 - **All Tasks Completed State:** All tasks for today checked off. Shows celebratory encouragement (*"All done for today! Take a break."*).
@@ -142,20 +167,25 @@ The application consists of a single responsive web interface with a top segment
 
 ## Edge Cases
 
-1. **No exams entered yet:** Prevent schedule generation and present friendly onboarding state.
-2. **Exam date in past or today:** Validation prevents past dates; exam today flags *"Exam Day - Best of luck!"*.
-3. **Multiple exams on same day:** Planner splits available daily hours across both subjects leading up to that shared date.
+1. **No exams entered yet:** Prevent schedule generation and present friendly onboarding state; Forecast tab shows clean empty state with *"Add my first exam"*.
+2. **Exam date in past or today:** Validation prevents past dates; exam today flags *"Exam Day - Best of luck!"*; passed exams are excluded from Forecast cards.
+3. **Multiple exams on same day:** Planner splits available daily hours across both subjects leading up to that shared date; Forecast calculates shared capacity.
 4. **More work than available hours:** Trigger the calm shortfall message instead of breaking the layout or scheduling beyond daily limits.
-5. **All tasks finished early:** Day status updates to complete; no re-plan needed if *"I missed today"* is clicked.
-6. **Very tight deadline (exam in 1-2 days):** Planner allocates immediate revision blocks up to the daily hour limit.
-7. **Missing the day before an exam:** Light revision shifts to remaining morning hours if possible, or displays gentle encouragement.
-8. **Deleting an exam after plan exists:** Prompts brief confirmation, removes subject, and rebalances remaining schedule cleanly.
+5. **All tasks finished early / all tasks done:** Day status updates to complete; Forecast shows 100% coverage with encouraging completion banner.
+6. **Needed hours equal zero for a subject:** Coverage shows 100% without division-by-zero errors.
+7. **Very tight deadline (exam in 1-2 days):** Planner allocates immediate revision blocks up to the daily hour limit.
+8. **Missing the day before an exam:** Light revision shifts to remaining morning hours if possible, or displays gentle encouragement.
+9. **Deleting an exam after plan exists:** Prompts brief confirmation, removes subject, and rebalances remaining schedule cleanly.
+10. **Slider at minimum (1.0h) and maximum (10.0h):** Forecast smoothly handles extreme values without freezing or layout overflow.
+11. **Even 12h/day cannot cover workload:** Reassuring advisory notes explain the shortfall and display prioritized trimming order.
+12. **Page refresh while on Forecast tab:** App restores to the Forecast tab; saved hours setting remains intact.
 
 ---
 
 ## Product Decisions
 
 - **Preview First, Then Apply:** Rather than immediately modifying the calendar on a click, the user gets an explicit diff preview with Cancel and Undo, removing anxiety.
+- **Simulation Isolated From Real State:** Forecast slider moves never mutate saved plans or settings until explicitly confirmed.
 - **No Harsh Red Warnings:** Changed days and extra hours use warm amber; errors and shortfalls use calm informational banners.
 - **Single-Device Local Storage:** No account registration or external databases needed for the proof of concept, guaranteeing speed, zero setup friction, and reliable demo performance.
 - **Strict POC Boundaries:** No calendar sync, external push notifications, or AI chatbots in this phase to guarantee a robust, complete delivery in an afternoon.
@@ -165,17 +195,17 @@ The application consists of a single responsive web interface with a top segment
 ## Demo Script Outline (Target: ~2 minutes)
 
 1. **First run (~10s):** Open clean browser. Show Welcome screen with *"Add my first exam"*.
-2. **Add exams (~25s):** 
+2. **Add exams (~20s):** 
    - Calculus: 6 days away, 8 chapters, difficulty 4.
    - Physics: 8 days away, 6 chapters, difficulty 5.
    - Economics: 10 days away, 5 chapters, difficulty 2.
    - Daily hours: 4h/day. Click *"Generate Study Plan"*.
 3. **Plan view (~15s):** Inspect full plan. Point out heavier weight for Calculus/Physics and light revision day before exams.
-4. **Today screen (~15s):** Show today's tasks. Tick 2 tasks ("2 of 4 tasks done"). Leave remaining tasks unticked.
-5. **The Rebound Moment (~30s):** Tap *"I missed today"*. Walk through preview headline, before/after hours in amber. Tap *"Apply"*. Point out highlighted changed days and demonstrate *"Undo"*.
-6. **Persistence (~5s):** Refresh page. Show all data and states intact.
-7. **Reality check (~10s):** Edit daily hours from 4 to 2. Show the calm shortfall message and explanation of trimmed work.
-8. **Phone width (~5s):** Resize browser to mobile viewport width. Show clean responsive layout on Today screen.
+4. **Today screen (~15s):** Show today's tasks. Tick 2 tasks ("2 of 3 tasks done"). Leave remaining tasks unticked.
+5. **The Rebound Moment (~25s):** Tap *"I missed today"*. Walk through preview headline, before/after hours in amber. Tap *"Apply"*. Point out highlighted changed days and demonstrate *"Undo"*.
+6. **Reality Check Forecast (~25s):** Switch to the new *"Forecast"* tab. Show "Where you stand" coverage bars and status badges. Move slider to 2.5h/day to show tight/behind coverage, then show minimum needed sentence (*"To cover everything you need about 3.5 hours a day"*). Move to 5.0h/day and click *"Use 5.0 hours/day"*. Confirm and verify plan updates smoothly.
+7. **Persistence (~5s):** Refresh page. Show all data and states intact.
+8. **Phone width (~5s):** Resize browser to mobile viewport width. Show clean responsive layout across Today, Full Plan, and Forecast.
 
 ---
 
@@ -188,6 +218,8 @@ The application consists of a single responsive web interface with a top segment
 - "I missed today" action and re-plan diff preview modal with amber highlights.
 - Apply, Cancel, and Undo state handling.
 - Shortfall capacity detection with supportive messaging.
+- Reality Check Forecast what-if simulator tab with live slider and coverage bars.
+- Minimum study hours calculator.
 - Full responsive styling (mobile + desktop).
 - LocalStorage persistence.
 
@@ -205,4 +237,4 @@ The application consists of a single responsive web interface with a top segment
 - Automated chapter content scraping or flashcard generation.
 
 ## Open Questions
-- None blocking spec: algorithm mechanics, exact weighting formulas, and day-by-day numbers will be detailed in `4-spec`.
+- None blocking spec: algorithm mechanics, exact weighting formulas, and day-by-day numbers are detailed in `4-spec`.
